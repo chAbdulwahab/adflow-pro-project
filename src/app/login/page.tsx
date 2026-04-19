@@ -57,7 +57,7 @@ export default function LoginPage() {
           Don't have an account? <Link href="/register" style={{ color: '#818cf8', fontWeight: 600 }}>Create one free</Link>
         </p>
 
-        {/* Quick test credentials */}
+        {/* Quick test credentials
         <div style={{ marginTop: 20, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
           <p style={{ color: '#475569', fontSize: 11, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase' }}>Test Credentials</p>
           {[
@@ -71,6 +71,7 @@ export default function LoginPage() {
             </div>
           ))}
         </div>
+        */}
       </div>
     </div>
   );
