@@ -119,51 +119,56 @@ export default function NotificationsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {notifications.map(n => {
             const isUnread = !n.is_read;
-            const CardWrapper = n.link ? Link : 'div';
-            const wrapperProps = n.link ? { href: n.link } : {};
+            const cardStyles: React.CSSProperties = { 
+              display: 'block', 
+              padding: '18px 20px', 
+              borderLeft: isUnread ? '4px solid #6366f1' : '4px solid transparent',
+              background: isUnread ? 'rgba(99,102,241,0.06)' : 'var(--surface)',
+              textDecoration: 'none',
+              color: 'inherit'
+            };
+
+            const CardContent = (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#818cf8' }}>
+                      {n.type.replace(/_/g, ' ')}
+                    </span>
+                    {isUnread && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8' }} />}
+                  </div>
+                  <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 6, color: '#e2e8f0' }}>{n.title}</p>
+                  <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.5, marginBottom: 10 }}>{n.message}</p>
+                  <p style={{ color: '#475569', fontSize: 12 }}>
+                    {new Date(n.created_at).toLocaleString('en-PK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+
+                {/* Actions prevent following link */}
+                <div style={{ display: 'flex', gap: 8, zIndex: 10 }}>
+                  {isUnread && (
+                    <button onClick={(e) => markSingleRead(n.id, e)} className="btn btn-ghost btn-sm" style={{ padding: '4px 8px', fontSize: 12 }}>
+                      ✓ Mark read
+                    </button>
+                  )}
+                  <button onClick={(e) => deleteNotif(n.id, e)} className="btn btn-ghost btn-sm" style={{ padding: '4px 8px', fontSize: 12, color: '#f87171' }}>
+                    Trash
+                  </button>
+                </div>
+              </div>
+            );
 
             return (
               <div key={n.id} style={{ position: 'relative' }}>
-                <CardWrapper 
-                  {...wrapperProps}
-                  className={`card ${n.link ? 'card-hover' : ''}`} 
-                  style={{ 
-                    display: 'block', 
-                    padding: '18px 20px', 
-                    borderLeft: isUnread ? '4px solid #6366f1' : '4px solid transparent',
-                    background: isUnread ? 'rgba(99,102,241,0.06)' : 'var(--surface)',
-                    textDecoration: 'none',
-                    color: 'inherit'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#818cf8' }}>
-                          {n.type.replace(/_/g, ' ')}
-                        </span>
-                        {isUnread && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8' }} />}
-                      </div>
-                      <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 6, color: '#e2e8f0' }}>{n.title}</p>
-                      <p style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.5, marginBottom: 10 }}>{n.message}</p>
-                      <p style={{ color: '#475569', fontSize: 12 }}>
-                        {new Date(n.created_at).toLocaleString('en-PK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-
-                    {/* Actions prevent following link */}
-                    <div style={{ display: 'flex', gap: 8, zIndex: 10 }}>
-                      {isUnread && (
-                        <button onClick={(e) => markSingleRead(n.id, e)} className="btn btn-ghost btn-sm" style={{ padding: '4px 8px', fontSize: 12 }}>
-                          ✓ Mark read
-                        </button>
-                      )}
-                      <button onClick={(e) => deleteNotif(n.id, e)} className="btn btn-ghost btn-sm" style={{ padding: '4px 8px', fontSize: 12, color: '#f87171' }}>
-                        Trash
-                      </button>
-                    </div>
+                {n.link ? (
+                  <Link href={n.link} className="card card-hover" style={cardStyles}>
+                    {CardContent}
+                  </Link>
+                ) : (
+                  <div className="card" style={cardStyles}>
+                    {CardContent}
                   </div>
-                </CardWrapper>
+                )}
               </div>
             );
           })}

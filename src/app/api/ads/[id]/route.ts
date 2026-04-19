@@ -178,7 +178,7 @@ export async function DELETE(
     const ad = adCheck.rows[0];
 
     // 2. Enforce Role-Based Access Control
-    if (ad.user_id !== actor.id && actor.role === 'user') {
+    if (ad.user_id !== actor.id && actor.role === 'client') {
       return errorResponse('You are not authorized to delete this ad', 403);
     }
 
