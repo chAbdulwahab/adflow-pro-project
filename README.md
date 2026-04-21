@@ -30,7 +30,7 @@
 <!-- These are placeholders for project screenshots to showcase the UI/UX -->
 
 <div align="center">
-  <img src="https://via.placeholder.com/800x450/1e1b4b/cbd5e1?text=Home+Page+Hero+Section" alt="Home Page" width="800" />
+  <img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/3176fef2-32e9-4233-962c-48ad220f3e72" />
   <br />
   <img src="https://via.placeholder.com/800x450/1e1b4b/cbd5e1?text=Marketplace+Explore+View" alt="Explore View" width="800" />
   <br />
@@ -46,9 +46,9 @@ Use the following credentials to explore the different roles within the platform
 
 | Role | Email | Password |
 | :--- | :--- | :--- |
-| **🚀 Super Admin** | `admin@test.com` | `123456` |
-| **🛡️ Moderator** | `moderator@test.com` | `123456` |
-| **👤 Client/User** | `abdul@test.com` | `123456` |
+| **🚀 Super Admin** | `admin@gmail.com` | `123456` |
+| **🛡️ Moderator** | `moderator@gmail.com` | `123456` |
+| **👤 Client/User** | `user@gmail.com` | `123456` |
 
 ---
 
