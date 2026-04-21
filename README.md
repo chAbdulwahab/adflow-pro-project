@@ -73,7 +73,7 @@ Use the following credentials to explore the different roles within the platform
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/adflow-pro.git
+   git clone https://github.com/chAbdulwahab/adflow-pro.git
    cd adflow-pro
    ```
 
@@ -86,8 +86,6 @@ Use the following credentials to explore the different roles within the platform
    Create a `.env.local` file in the root directory and add the following:
    ```env
    DATABASE_URL=your_postgresql_connection_string
-   JWT_SECRET=your_jwt_secret_key
-   GEMINI_API_KEY=your_google_ai_key
    ```
 
 4. **Database Schema:**
@@ -125,7 +123,7 @@ adflow-pro/
 ## 📄 License & Contact
 
 Developed with ❤️ for the Pakistani Marketplace.  
-For support or inquiries, please contact the repository owner.
+For support or inquiries, please contact the chAbdulwahab (owner).
 
 ---
 
