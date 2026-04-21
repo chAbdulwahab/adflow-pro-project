@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
 // ============================================
@@ -13,74 +13,96 @@ export async function GET(
   try {
     const { slug } = await params;
 
-    // 1. Fetch the ad (enforce public visibility rules)
-    const adResult = await db.query(
-      `SELECT
-         a.id, a.title, a.slug, a.description, a.price,
-         a.is_featured, a.rank_score, a.publish_at, a.expire_at, a.created_at,
-         c.name  AS category_name,
-         c.slug  AS category_slug,
-         ct.name AS city_name,
-         ct.slug AS city_slug,
-         p.name  AS package_name,
-         u.name  AS owner_name,
-         sp.display_name  AS seller_display_name,
-         sp.business_name AS seller_business_name,
-         sp.phone         AS seller_phone,
-         sp.city          AS seller_city,
-         sp.is_verified   AS seller_verified
-       FROM ads a
-       JOIN users u          ON a.user_id    = u.id
-       LEFT JOIN categories c  ON a.category_id = c.id
-       LEFT JOIN cities ct     ON a.city_id     = ct.id
-       LEFT JOIN packages p    ON a.package_id  = p.id
-       LEFT JOIN seller_profiles sp ON sp.user_id = u.id
-       WHERE a.slug = $1
-         AND a.status = 'published'
-         AND a.expire_at > NOW()`,
-      [slug]
-    );
+    // 1. Fetch the ad (enforce public visibility rules) using Supabase
+    const { data: adData, error: adError } = await supabaseAdmin
+      .from('ads')
+      .select(`
+        id, title, slug, description, price,
+        is_featured, rank_score, publish_at, expire_at, created_at,
+        category_id,
+        categories ( name, slug ),
+        cities ( name, slug ),
+        packages ( name ),
+        users!user_id ( 
+          name, 
+          seller_profiles ( display_name, business_name, phone, city, is_verified )
+        )
+      `)
+      .eq('slug', slug)
+      .eq('status', 'published')
+      .gt('expire_at', new Date().toISOString())
+      .maybeSingle();
 
-    if (adResult.rows.length === 0) {
+    if (adError) throw adError;
+    if (!adData) {
       return errorResponse('Ad not found or no longer available', 404);
     }
 
-    const ad = adResult.rows[0];
+    // Flatten ad data
+    const sellerProfile = adData.users?.seller_profiles?.[0];
+
+    const ad = {
+      ...adData,
+      category_name: adData.categories?.name,
+      category_slug: adData.categories?.slug,
+      city_name:     adData.cities?.name,
+      city_slug:     adData.cities?.slug,
+      package_name:  adData.packages?.name,
+      owner_name:    adData.users?.name,
+      seller_display_name:  sellerProfile?.display_name || adData.users?.name,
+      seller_business_name: sellerProfile?.business_name,
+      seller_phone:         sellerProfile?.phone,
+      seller_city:          sellerProfile?.city,
+      seller_verified:      sellerProfile?.is_verified || false,
+      categories: undefined,
+      cities:     undefined,
+      packages:   undefined,
+      users:      undefined,
+      seller_profiles: undefined
+    };
 
     // 2. Fetch all valid media for this ad
-    const mediaResult = await db.query(
-      `SELECT source_type, original_url, normalized_thumbnail_url, display_order
-       FROM ad_media
-       WHERE ad_id = $1 AND validation_status = 'valid'
-       ORDER BY display_order`,
-      [ad.id]
-    );
+    const { data: mediaResult, error: mediaError } = await supabaseAdmin
+      .from('ad_media')
+      .select('source_type, original_url, normalized_thumbnail_url, display_order')
+      .eq('ad_id', ad.id)
+      .eq('validation_status', 'valid')
+      .order('display_order', { ascending: true });
+
+    if (mediaError) throw mediaError;
 
     // 3. Fetch related ads (same category, excluding this one, limit 4)
-    const relatedResult = await db.query(
-      `SELECT
-         a.id, a.title, a.slug, a.price, a.is_featured,
-         ct.name AS city_name,
-         (SELECT normalized_thumbnail_url FROM ad_media
-          WHERE ad_id = a.id AND validation_status = 'valid'
-          ORDER BY display_order LIMIT 1) AS thumbnail
-       FROM ads a
-       LEFT JOIN cities ct ON a.city_id = ct.id
-       WHERE a.status = 'published'
-         AND a.expire_at > NOW()
-         AND a.category_id = (SELECT category_id FROM ads WHERE slug = $1)
-         AND a.slug != $1
-       ORDER BY a.rank_score DESC
-       LIMIT 4`,
-      [slug]
-    );
+    const { data: relatedData, error: relatedError } = await supabaseAdmin
+      .from('ads')
+      .select(`
+        id, title, slug, price, is_featured,
+        cities ( name ),
+        ad_media ( normalized_thumbnail_url )
+      `)
+      .eq('status', 'published')
+      .gt('expire_at', new Date().toISOString())
+      .eq('category_id', adData.category_id)
+      .neq('slug', slug)
+      .filter('ad_media.validation_status', 'eq', 'valid')
+      .order('rank_score', { ascending: false })
+      .limit(4);
+
+    if (relatedError) throw relatedError;
+
+    const relatedAds = (relatedData || []).map(r => ({
+      ...r,
+      city_name: r.cities?.name,
+      thumbnail: r.ad_media?.[0]?.normalized_thumbnail_url,
+      cities: undefined,
+      ad_media: undefined
+    }));
 
     return successResponse({
       ad: {
         ...ad,
-        media: mediaResult.rows,
+        media: mediaResult || [],
       },
-      related_ads: relatedResult.rows,
+      related_ads: relatedAds,
     });
   } catch (error: any) {
     console.error('Ad detail error:', error);

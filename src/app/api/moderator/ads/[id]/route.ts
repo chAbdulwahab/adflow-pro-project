@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { requireRole } from '@/lib/auth';
 import { reviewSchema } from '@/lib/validators';
 import { transitionAdStatus } from '@/lib/status-machine';
@@ -16,49 +16,75 @@ export async function GET(
     requireRole(req, 'moderator', 'admin', 'super_admin');
     const { id: adId } = await params;
 
-    const [adResult, mediaResult, historyResult] = await Promise.all([
-      db.query(
-        `SELECT
-           a.*,
-           u.name  AS owner_name,
-           u.email AS owner_email,
-           c.name  AS category_name,
-           ct.name AS city_name,
-           p.name  AS package_name,
-           p.price AS package_price,
-           sp.display_name AS seller_display_name,
-           sp.is_verified  AS seller_verified
-         FROM ads a
-         JOIN users u          ON a.user_id    = u.id
-         LEFT JOIN categories c  ON a.category_id = c.id
-         LEFT JOIN cities ct     ON a.city_id     = ct.id
-         LEFT JOIN packages p    ON a.package_id  = p.id
-         LEFT JOIN seller_profiles sp ON sp.user_id = u.id
-         WHERE a.id = $1`,
-        [adId]
-      ),
-      db.query(
-        'SELECT * FROM ad_media WHERE ad_id = $1 ORDER BY display_order',
-        [adId]
-      ),
-      db.query(
-        `SELECT ash.*, u.name AS changed_by_name
-         FROM ad_status_history ash
-         LEFT JOIN users u ON ash.changed_by = u.id
-         WHERE ash.ad_id = $1
-         ORDER BY ash.changed_at DESC`,
-        [adId]
-      ),
+    const [adRes, mediaRes, historyRes] = await Promise.all([
+      supabaseAdmin
+        .from('ads')
+        .select(`
+          *,
+          users!user_id ( 
+            name, 
+            email,
+            seller_profiles ( display_name, is_verified )
+          ),
+          categories ( name ),
+          cities ( name ),
+          packages ( name, price )
+        `)
+        .eq('id', adId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('ad_media')
+        .select('*')
+        .eq('ad_id', adId)
+        .order('display_order', { ascending: true }),
+      supabaseAdmin
+        .from('ad_status_history')
+        .select(`
+          *,
+          users!changed_by ( name )
+        `)
+        .eq('ad_id', adId)
+        .order('changed_at', { ascending: false })
     ]);
 
-    if (adResult.rows.length === 0) {
+    if (adRes.error) throw adRes.error;
+    if (mediaRes.error) throw mediaRes.error;
+    if (historyRes.error) throw historyRes.error;
+
+    if (!adRes.data) {
       return errorResponse('Ad not found', 404);
     }
 
+    // Flatten ad data
+    const sellerProfile = adRes.data.users?.seller_profiles?.[0];
+
+    const ad = {
+      ...adRes.data,
+      owner_name: adRes.data.users?.name,
+      owner_email: adRes.data.users?.email,
+      category_name: adRes.data.categories?.name,
+      city_name: adRes.data.cities?.name,
+      package_name: adRes.data.packages?.name,
+      package_price: adRes.data.packages?.price,
+      seller_display_name: sellerProfile?.display_name || adRes.data.users?.name,
+      seller_verified: sellerProfile?.is_verified || false,
+      users: undefined,
+      categories: undefined,
+      cities: undefined,
+      packages: undefined
+    };
+
+    // Flatten history
+    const history = (historyRes.data || []).map(h => ({
+      ...h,
+      changed_by_name: h.users?.name,
+      users: undefined
+    }));
+
     return successResponse({
-      ad: adResult.rows[0],
-      media: mediaResult.rows,
-      history: historyResult.rows,
+      ad,
+      media: mediaRes.data || [],
+      history,
     });
   } catch (error: any) {
     return handleAuthError(error);
@@ -94,16 +120,16 @@ export async function POST(
     }
 
     // 1. Fetch current ad
-    const adResult = await db.query(
-      'SELECT id, status, user_id FROM ads WHERE id = $1',
-      [adId]
-    );
+    const { data: ad, error: fetchError } = await supabaseAdmin
+      .from('ads')
+      .select('id, status, user_id')
+      .eq('id', adId)
+      .maybeSingle();
 
-    if (adResult.rows.length === 0) {
+    if (fetchError) throw fetchError;
+    if (!ad) {
       return errorResponse('Ad not found', 404);
     }
-
-    const ad = adResult.rows[0];
 
     // 2. Ad must be in 'submitted' or 'under_review' to be reviewed
     if (!['submitted', 'under_review'].includes(ad.status)) {
@@ -117,7 +143,6 @@ export async function POST(
 
     if (action === 'approve') {
       // Two-step approve: submitted → under_review → payment_pending
-      // If already under_review, skip first step
       if (ad.status === 'submitted') {
         await transitionAdStatus({
           adId,
@@ -137,16 +162,17 @@ export async function POST(
       });
 
       // Notify the ad owner
-      await db.query(
-        `INSERT INTO notifications (user_id, title, message, type, link)
-         VALUES ($1, $2, $3, 'ad_approved', $4)`,
-        [
-          ad.user_id,
-          'Your ad has been approved!',
-          'Your ad passed moderation. Please proceed with payment to publish it.',
-          `/ads/${adId}/payment`,
-        ]
-      );
+      const { error: notifError } = await supabaseAdmin
+        .from('notifications')
+        .insert({
+          user_id: ad.user_id,
+          title: 'Your ad has been approved!',
+          message: 'Your ad passed moderation. Please proceed with payment to publish it.',
+          type: 'ad_approved',
+          link: `/ads/${adId}/payment`
+        });
+
+      if (notifError) throw notifError;
 
       return successResponse({
         message: 'Ad approved — status set to payment_pending',
@@ -156,10 +182,12 @@ export async function POST(
 
     // action === 'reject'
     // First save the rejection reason on the ad
-    await db.query(
-      'UPDATE ads SET rejection_reason = $1, updated_at = NOW() WHERE id = $2',
-      [rejection_reason, adId]
-    );
+    const { error: updateError } = await supabaseAdmin
+      .from('ads')
+      .update({ rejection_reason, updated_at: new Date().toISOString() })
+      .eq('id', adId);
+
+    if (updateError) throw updateError;
 
     await transitionAdStatus({
       adId,
@@ -170,16 +198,17 @@ export async function POST(
     });
 
     // Notify owner
-    await db.query(
-      `INSERT INTO notifications (user_id, title, message, type, link)
-       VALUES ($1, $2, $3, 'ad_rejected', $4)`,
-      [
-        ad.user_id,
-        'Your ad was rejected',
-        `Reason: ${rejection_reason}. You can edit and resubmit your ad.`,
-        `/ads/${adId}`,
-      ]
-    );
+    const { error: notifError } = await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: ad.user_id,
+        title: 'Your ad was rejected',
+        message: `Reason: ${rejection_reason}. You can edit and resubmit your ad.`,
+        type: 'ad_rejected',
+        link: `/ads/${adId}`
+      });
+
+    if (notifError) throw notifError;
 
     return successResponse({
       message: 'Ad rejected',

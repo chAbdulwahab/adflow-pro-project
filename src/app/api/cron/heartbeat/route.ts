@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { isCronAuthorized } from '@/lib/cron-auth';
 
 // ============================================
@@ -16,78 +16,65 @@ export async function GET(req: NextRequest) {
   const startTime = Date.now();
 
   try {
-    // Run all health checks in parallel
-    const [dbPing, adStats, paymentStats, recentErrors] = await Promise.all([
-      // 1. DB latency ping
-      db.query('SELECT NOW() AS time'),
+    const now = new Date().toISOString();
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // 2. Ad status counts
-      db.query(`
-        SELECT status, COUNT(*) AS count
-        FROM ads
-        GROUP BY status
-        ORDER BY status
-      `),
-
-      // 3. Payment pending count
-      db.query(`
-        SELECT status, COUNT(*) AS count
-        FROM payments
-        GROUP BY status
-      `),
-
-      // 4. Recent error logs (last 24h)
-      db.query(`
-        SELECT COUNT(*) AS error_count
-        FROM system_health_logs
-        WHERE status = 'error'
-          AND checked_at > NOW() - INTERVAL '24 hours'
-      `),
+    // Run all health checks in parallel using Supabase client
+    const [adStatsRes, paymentStatsRes, recentErrorsRes] = await Promise.all([
+      // 1. Ad status counts
+      supabaseAdmin.from('ads').select('status'),
+      // 2. Payment status counts
+      supabaseAdmin.from('payments').select('status'),
+      // 3. Recent error logs (last 24h)
+      supabaseAdmin
+        .from('system_health_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'error')
+        .gt('checked_at', yesterday)
     ]);
 
+    if (adStatsRes.error) throw adStatsRes.error;
+    if (paymentStatsRes.error) throw paymentStatsRes.error;
+
+    // Process stats in memory
+    const adStatusMap: Record<string, number> = {};
+    (adStatsRes.data || []).forEach(a => {
+      adStatusMap[a.status] = (adStatusMap[a.status] || 0) + 1;
+    });
+
+    const paymentStatusMap: Record<string, number> = {};
+    (paymentStatsRes.data || []).forEach(p => {
+      paymentStatusMap[p.status] = (paymentStatusMap[p.status] || 0) + 1;
+    });
+
     const responseMs = Date.now() - startTime;
-
-    // Build structured health report
-    const adStatusMap = Object.fromEntries(
-      adStats.rows.map((r: { status: string; count: string }) => [r.status, parseInt(r.count)])
-    );
-    const paymentStatusMap = Object.fromEntries(
-      paymentStats.rows.map((r: { status: string; count: string }) => [r.status, parseInt(r.count)])
-    );
-
-    const scheduledCount  = adStatusMap['scheduled']  ?? 0;
-    const publishedCount  = adStatusMap['published']  ?? 0;
-    const pendingPayments = paymentStatusMap['pending'] ?? 0;
-    const errorCount      = parseInt(recentErrors.rows[0].error_count);
-
-    // Determine overall health
+    const errorCount = recentErrorsRes.count || 0;
     const overallStatus = errorCount > 10 ? 'warning' : 'ok';
 
     // Log to system_health_logs
-    await db.query(
-      `INSERT INTO system_health_logs (source, response_ms, status, details)
-       VALUES ('cron/heartbeat', $1, $2, $3)`,
-      [
-        responseMs,
-        overallStatus,
-        JSON.stringify({
+    await supabaseAdmin
+      .from('system_health_logs')
+      .insert({
+        source: 'cron/heartbeat',
+        response_ms: responseMs,
+        status: overallStatus,
+        details: {
           db_latency_ms: responseMs,
           ads: adStatusMap,
           payments: paymentStatusMap,
           errors_24h: errorCount,
-        }),
-      ]
-    );
+        }
+      });
 
     return NextResponse.json({
       success: true,
       status: overallStatus,
-      timestamp: dbPing.rows[0].time,
+      timestamp: new Date().toISOString(),
       db_latency_ms: responseMs,
       summary: {
-        live_ads:         publishedCount,
-        scheduled_ads:    scheduledCount,
-        pending_payments: pendingPayments,
+        live_ads:         adStatusMap['published'] ?? 0,
+        scheduled_ads:    adStatusMap['scheduled'] ?? 0,
+        pending_payments: paymentStatusMap['pending'] ?? 0,
         errors_24h:       errorCount,
       },
       ads:      adStatusMap,
@@ -96,11 +83,14 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error('Heartbeat cron error:', error);
 
-    await db.query(
-      `INSERT INTO system_health_logs (source, response_ms, status, details)
-       VALUES ('cron/heartbeat', $1, 'error', $2)`,
-      [Date.now() - startTime, JSON.stringify({ error: error.message })]
-    ).catch(() => {});
+    await supabaseAdmin
+      .from('system_health_logs')
+      .insert({
+        source: 'cron/heartbeat',
+        response_ms: Date.now() - startTime,
+        status: 'error',
+        details: { error: error.message }
+      }).catch(() => {});
 
     return NextResponse.json(
       { success: false, status: 'error', error: error.message },

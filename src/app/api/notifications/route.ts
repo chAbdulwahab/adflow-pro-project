@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { requireAuth } from '@/lib/auth';
 import { successResponse, errorResponse, handleAuthError } from '@/lib/api-response';
 
@@ -19,41 +19,34 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(50, parseInt(searchParams.get('limit') ?? '20'));
     const offset = (page - 1) * limit;
 
-    const conditions = ['user_id = $1'];
-    const values: (string | number)[] = [actor.id];
-    let idx = 2;
+    let query = supabaseAdmin
+      .from('notifications')
+      .select('id, title, message, type, is_read, link, created_at', { count: 'exact' })
+      .eq('user_id', actor.id)
+      .order('created_at', { ascending: false });
 
     if (unreadOnly) {
-      conditions.push('is_read = false');
+      query = query.eq('is_read', false);
     }
 
-    const whereClause = conditions.join(' AND ');
+    const { data: notifications, count, error } = await query.range(offset, offset + limit - 1);
 
-    const [notifResult, countResult, unreadCountResult] = await Promise.all([
-      db.query(
-        `SELECT id, title, message, type, is_read, link, created_at
-         FROM notifications
-         WHERE ${whereClause}
-         ORDER BY created_at DESC
-         LIMIT $${idx} OFFSET $${idx + 1}`,
-        [...values, limit, offset]
-      ),
-      db.query(
-        `SELECT COUNT(*) AS total FROM notifications WHERE ${whereClause}`,
-        values
-      ),
-      db.query(
-        'SELECT COUNT(*) AS unread FROM notifications WHERE user_id = $1 AND is_read = false',
-        [actor.id]
-      ),
-    ]);
+    if (error) throw error;
 
-    const total  = parseInt(countResult.rows[0].total);
-    const unread = parseInt(unreadCountResult.rows[0].unread);
+    // Separate count for total unread
+    const { count: unreadCount, error: unreadError } = await supabaseAdmin
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', actor.id)
+      .eq('is_read', false);
+
+    if (unreadError) throw unreadError;
+
+    const total = count || 0;
 
     return successResponse({
-      notifications: notifResult.rows,
-      unread_count: unread,
+      notifications: notifications || [],
+      unread_count: unreadCount || 0,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
   } catch (error: any) {
@@ -68,17 +61,18 @@ export async function PATCH(req: NextRequest) {
   try {
     const actor = requireAuth(req);
 
-    const result = await db.query(
-      `UPDATE notifications
-       SET is_read = true
-       WHERE user_id = $1 AND is_read = false
-       RETURNING id`,
-      [actor.id]
-    );
+    const { data, error, count } = await supabaseAdmin
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', actor.id)
+      .eq('is_read', false)
+      .select('id', { count: 'exact' });
+
+    if (error) throw error;
 
     return successResponse({
-      message: `Marked ${result.rowCount} notifications as read`,
-      updated: result.rowCount,
+      message: `Marked ${count || 0} notifications as read`,
+      updated: count || 0,
     });
   } catch (error: any) {
     return handleAuthError(error);

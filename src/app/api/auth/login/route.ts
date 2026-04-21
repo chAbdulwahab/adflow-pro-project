@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { verifyPassword, signToken } from '@/lib/auth';
 import { loginSchema } from '@/lib/validators';
 import { successResponse, errorResponse } from '@/lib/api-response';
@@ -18,18 +18,18 @@ export async function POST(req: NextRequest) {
 
     const { email, password } = parsed.data;
 
-    // 2. Find user
-    const result = await db.query(
-      `SELECT id, name, email, password_hash, role, status
-       FROM users WHERE email = $1`,
-      [email]
-    );
+    // 2. Find user using Supabase client
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id, name, email, password_hash, role, status')
+      .eq('email', email)
+      .maybeSingle();
 
-    if (result.rows.length === 0) {
+    if (userError) throw userError;
+
+    if (!user) {
       return errorResponse('Invalid credentials', 401);
     }
-
-    const user = result.rows[0];
 
     // 3. Check account status
     if (user.status !== 'active') {

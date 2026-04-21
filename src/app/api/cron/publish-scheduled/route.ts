@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { isCronAuthorized } from '@/lib/cron-auth';
 import { transitionAdStatus } from '@/lib/status-machine';
 
@@ -18,16 +18,20 @@ export async function GET(req: NextRequest) {
   const results: { adId: string; title: string; success: boolean; error?: string }[] = [];
 
   try {
-    // Find all ads ready to publish
-    const scheduledAds = await db.query(
-      `SELECT id, title, user_id FROM ads
-       WHERE status = 'scheduled'
-         AND publish_at <= NOW()
-       ORDER BY publish_at ASC
-       LIMIT 100` // Safety limit per run
-    );
+    const now = new Date().toISOString();
 
-    if (scheduledAds.rows.length === 0) {
+    // Find all ads ready to publish using Supabase
+    const { data: scheduledAds, error: fetchError } = await supabaseAdmin
+      .from('ads')
+      .select('id, title, user_id')
+      .eq('status', 'scheduled')
+      .lte('publish_at', now)
+      .order('publish_at', { ascending: true })
+      .limit(100);
+
+    if (fetchError) throw fetchError;
+
+    if (!scheduledAds || scheduledAds.length === 0) {
       return NextResponse.json({
         success: true,
         message: 'No scheduled ads ready to publish',
@@ -37,10 +41,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Transition each one — use a system actor ID placeholder
-    // We use null actor for cron-driven transitions (logged as system)
     const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
 
-    for (const ad of scheduledAds.rows) {
+    for (const ad of scheduledAds) {
       try {
         await transitionAdStatus({
           adId: ad.id,
@@ -50,16 +53,15 @@ export async function GET(req: NextRequest) {
         });
 
         // Notify the owner
-        await db.query(
-          `INSERT INTO notifications (user_id, title, message, type, link)
-           VALUES ($1, $2, $3, 'ad_published', $4)`,
-          [
-            ad.user_id,
-            '🎉 Your ad is now live!',
-            `"${ad.title}" has just gone live and is visible to buyers.`,
-            `/ads/${ad.id}`,
-          ]
-        );
+        await supabaseAdmin
+          .from('notifications')
+          .insert({
+            user_id: ad.user_id,
+            title: '🎉 Your ad is now live!',
+            message: `"${ad.title}" has just gone live and is visible to buyers.`,
+            type: 'ad_published',
+            link: `/ads/${ad.id}`
+          });
 
         results.push({ adId: ad.id, title: ad.title, success: true });
       } catch (err: any) {
@@ -72,15 +74,14 @@ export async function GET(req: NextRequest) {
     const failed    = results.filter(r => !r.success).length;
 
     // Log to system_health_logs
-    await db.query(
-      `INSERT INTO system_health_logs (source, response_ms, status, details)
-       VALUES ('cron/publish-scheduled', $1, $2, $3)`,
-      [
-        Date.now() - startTime,
-        failed === 0 ? 'ok' : 'warning',
-        JSON.stringify({ published, failed, total: scheduledAds.rows.length }),
-      ]
-    );
+    await supabaseAdmin
+      .from('system_health_logs')
+      .insert({
+        source: 'cron/publish-scheduled',
+        response_ms: Date.now() - startTime,
+        status: failed === 0 ? 'ok' : 'warning',
+        details: { published, failed, total: scheduledAds.length }
+      });
 
     return NextResponse.json({
       success: true,
@@ -92,11 +93,14 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error('Cron publish-scheduled error:', error);
 
-    await db.query(
-      `INSERT INTO system_health_logs (source, response_ms, status, details)
-       VALUES ('cron/publish-scheduled', $1, 'error', $2)`,
-      [Date.now() - startTime, JSON.stringify({ error: error.message })]
-    ).catch(() => {}); // Don't throw if logging fails
+    await supabaseAdmin
+      .from('system_health_logs')
+      .insert({
+        source: 'cron/publish-scheduled',
+        response_ms: Date.now() - startTime,
+        status: 'error',
+        details: { error: error.message }
+      }).catch(() => {});
 
     return NextResponse.json(
       { success: false, error: error.message },

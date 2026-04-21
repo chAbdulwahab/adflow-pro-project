@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { hashPassword, signToken } from '@/lib/auth';
 import { registerSchema } from '@/lib/validators';
 import { successResponse, errorResponse } from '@/lib/api-response';
@@ -19,12 +19,15 @@ export async function POST(req: NextRequest) {
 
     const { name, email, password, phone, city, business_name } = parsed.data;
 
-    // 2. Check if email already exists
-    const existing = await db.query(
-      'SELECT id FROM users WHERE email = $1',
-      [email]
-    );
-    if (existing.rows.length > 0) {
+    // 2. Check if email already exists using Supabase
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+    if (existing) {
       return errorResponse('Email already registered', 409);
     }
 
@@ -32,20 +35,31 @@ export async function POST(req: NextRequest) {
     const password_hash = await hashPassword(password);
 
     // 4. Insert user (default role: client)
-    const userResult = await db.query(
-      `INSERT INTO users (name, email, password_hash, role)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, email, role, status, created_at`,
-      [name, email, password_hash, ROLES.CLIENT]
-    );
-    const user = userResult.rows[0];
+    const { data: user, error: userInsertError } = await supabaseAdmin
+      .from('users')
+      .insert({
+        name,
+        email,
+        password_hash,
+        role: ROLES.CLIENT
+      })
+      .select('id, name, email, role, status, created_at')
+      .single();
+
+    if (userInsertError) throw userInsertError;
 
     // 5. Create seller profile with the extra info
-    await db.query(
-      `INSERT INTO seller_profiles (user_id, display_name, phone, city, business_name)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [user.id, name, phone, city, business_name || null]
-    );
+    const { error: profileError } = await supabaseAdmin
+      .from('seller_profiles')
+      .insert({
+        user_id: user.id,
+        display_name: name,
+        phone,
+        city,
+        business_name: business_name || null
+      });
+
+    if (profileError) throw profileError;
 
     // 6. Issue JWT
     const token = signToken({

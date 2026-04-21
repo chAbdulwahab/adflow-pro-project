@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { requireRole } from '@/lib/auth';
 import { paymentVerifySchema } from '@/lib/validators';
 import { transitionAdStatus } from '@/lib/status-machine';
@@ -35,29 +35,28 @@ export async function POST(
       return errorResponse('rejection_note is required when rejecting a payment', 400);
     }
 
-    // 2. Fetch the payment + its associated ad (with package info for publishing)
-    const paymentResult = await db.query(
-      `SELECT
-         p.*,
-         a.status      AS ad_status,
-         a.user_id     AS ad_owner_id,
-         a.package_id,
-         a.is_featured AS ad_is_featured,
-         pkg.duration_days,
-         pkg.is_featured AS pkg_is_featured,
-         pkg.weight      AS pkg_weight,
-         sp.is_verified  AS seller_verified
-       FROM payments p
-       JOIN ads a            ON p.ad_id    = a.id
-       LEFT JOIN packages pkg   ON a.package_id  = pkg.id
-       LEFT JOIN seller_profiles sp ON sp.user_id = a.user_id
-       WHERE p.id = $1`,
-      [paymentId]
-    );
+    // 2. Fetch the payment + its associated ad using Supabase
+    const { data: payment, error: paymentError } = await supabaseAdmin
+      .from('payments')
+      .select(`
+        *,
+        ads!inner (
+          id, status, user_id, package_id, is_featured,
+          packages ( duration_days, is_featured, weight ),
+          seller_profiles!user_id ( is_verified )
+        )
+      `)
+      .eq('id', paymentId)
+      .maybeSingle();
 
-    if (paymentResult.rows.length === 0) return errorResponse('Payment not found', 404);
+    if (paymentError) throw paymentError;
+    if (!payment) return errorResponse('Payment not found', 404);
 
-    const payment = paymentResult.rows[0];
+    const adStatus = payment.ads?.status;
+    const adOwnerId = payment.ads?.user_id;
+    const adPackage = payment.ads?.packages;
+    const adIsFeatured = payment.ads?.is_featured;
+    const sellerVerified = payment.ads?.seller_profiles?.is_verified;
 
     if (payment.status !== 'pending') {
       return errorResponse(
@@ -66,9 +65,9 @@ export async function POST(
       );
     }
 
-    if (payment.ad_status !== 'payment_submitted') {
+    if (adStatus !== 'payment_submitted') {
       return errorResponse(
-        `Ad is in '${payment.ad_status}' status. Expected 'payment_submitted'.`,
+        `Ad is in '${adStatus}' status. Expected 'payment_submitted'.`,
         422
       );
     }
@@ -78,12 +77,16 @@ export async function POST(
     // ── VERIFY ──────────────────────────────────────────────────────────────
     if (action === 'verify') {
       // 3a. Mark payment as verified
-      await db.query(
-        `UPDATE payments
-         SET status = 'verified', verified_by = $1, verified_at = NOW()
-         WHERE id = $2`,
-        [actor.id, paymentId]
-      );
+      const { error: pUpdateError } = await supabaseAdmin
+        .from('payments')
+        .update({
+          status: 'verified',
+          verified_by: actor.id,
+          verified_at: new Date().toISOString()
+        })
+        .eq('id', paymentId);
+      
+      if (pUpdateError) throw pUpdateError;
 
       // 3b. Transition: payment_submitted → payment_verified
       await transitionAdStatus({
@@ -94,31 +97,33 @@ export async function POST(
         ipAddress: ip,
       });
 
-      // 3c. Calculate publish/expire dates from package duration
-      const durationDays: number = payment.duration_days ?? 30;
+      // 3c. Calculate publish/expire dates
+      const durationDays: number = adPackage?.duration_days ?? 30;
       const publishAt  = new Date();
       const expireAt   = new Date(publishAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
-      const isFeatured: boolean = payment.pkg_is_featured ?? false;
+      const isFeatured: boolean = adPackage?.is_featured ?? false;
 
       const rankScore = calculateRankScore({
         is_featured:        isFeatured,
-        package_weight:     payment.pkg_weight ?? 1,
+        package_weight:     adPackage?.weight ?? 1,
         publish_at:         publishAt,
         admin_boost:        0,
-        seller_is_verified: payment.seller_verified ?? false,
+        seller_is_verified: sellerVerified ?? false,
       });
 
-      // 3d. Set publish/expire dates + featured flag + rank_score on the ad
-      await db.query(
-        `UPDATE ads
-         SET publish_at  = $1,
-             expire_at   = $2,
-             is_featured  = $3,
-             rank_score   = $4,
-             updated_at   = NOW()
-         WHERE id = $5`,
-        [publishAt, expireAt, isFeatured, rankScore, payment.ad_id]
-      );
+      // 3d. Set dates + rank_score on the ad
+      const { error: adUpdateError } = await supabaseAdmin
+        .from('ads')
+        .update({
+          publish_at: publishAt.toISOString(),
+          expire_at:  expireAt.toISOString(),
+          is_featured: isFeatured,
+          rank_score:  rankScore,
+          updated_at:  new Date().toISOString()
+        })
+        .eq('id', payment.ad_id);
+      
+      if (adUpdateError) throw adUpdateError;
 
       // 3e. Transition: payment_verified → published
       await transitionAdStatus({
@@ -129,17 +134,16 @@ export async function POST(
         ipAddress: ip,
       });
 
-      // 3f. Notify owner — ad is now LIVE
-      await db.query(
-        `INSERT INTO notifications (user_id, title, message, type, link)
-         VALUES ($1, $2, $3, 'ad_published', $4)`,
-        [
-          payment.ad_owner_id,
-          '🎉 Your ad is now live!',
-          `Your payment was verified and your ad is now publicly visible. It will stay live for ${durationDays} days.`,
-          `/ads/${payment.ad_id}`,
-        ]
-      );
+      // 3f. Notify owner
+      await supabaseAdmin
+        .from('notifications')
+        .insert({
+          user_id: adOwnerId,
+          title: '🎉 Your ad is now live!',
+          message: `Your payment was verified and your ad is now publicly visible. It will stay live for ${durationDays} days.`,
+          type: 'ad_published',
+          link: `/ads/${payment.ad_id}`
+        });
 
       return successResponse({
         message: 'Payment verified. Ad is now published and publicly visible.',
@@ -153,14 +157,19 @@ export async function POST(
     }
 
     // ── REJECT ──────────────────────────────────────────────────────────────
-    await db.query(
-      `UPDATE payments
-       SET status = 'rejected', rejection_note = $1, verified_by = $2, verified_at = NOW()
-       WHERE id = $3`,
-      [rejection_note, actor.id, paymentId]
-    );
+    const { error: pRejectError } = await supabaseAdmin
+      .from('payments')
+      .update({
+        status: 'rejected',
+        rejection_note: rejection_note,
+        verified_by: actor.id,
+        verified_at: new Date().toISOString()
+      })
+      .eq('id', paymentId);
+    
+    if (pRejectError) throw pRejectError;
 
-    // Roll back ad to payment_pending so client can resubmit
+    // Roll back ad to payment_pending
     await transitionAdStatus({
       adId: payment.ad_id,
       newStatus: 'payment_pending',
@@ -170,16 +179,15 @@ export async function POST(
     });
 
     // Notify owner
-    await db.query(
-      `INSERT INTO notifications (user_id, title, message, type, link)
-       VALUES ($1, $2, $3, 'payment_rejected', $4)`,
-      [
-        payment.ad_owner_id,
-        'Payment rejected',
-        `Your payment was rejected. Reason: ${rejection_note}. Please submit a new payment.`,
-        `/ads/${payment.ad_id}/payment`,
-      ]
-    );
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: adOwnerId,
+        title: 'Payment rejected',
+        message: `Your payment was rejected. Reason: ${rejection_note}. Please submit a new payment.`,
+        type: 'payment_rejected',
+        link: `/ads/${payment.ad_id}/payment`
+      });
 
     return successResponse({
       message: 'Payment rejected. Ad returned to payment_pending.',

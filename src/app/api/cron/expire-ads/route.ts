@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { isCronAuthorized } from '@/lib/cron-auth';
 import { transitionAdStatus } from '@/lib/status-machine';
 
@@ -18,16 +18,20 @@ export async function GET(req: NextRequest) {
   const results: { adId: string; title: string; success: boolean; error?: string }[] = [];
 
   try {
-    // Find all published ads that have now expired
-    const expiredAds = await db.query(
-      `SELECT id, title, user_id, expire_at FROM ads
-       WHERE status = 'published'
-         AND expire_at <= NOW()
-       ORDER BY expire_at ASC
-       LIMIT 100`
-    );
+    const now = new Date().toISOString();
 
-    if (expiredAds.rows.length === 0) {
+    // Find all published ads that have now expired using Supabase
+    const { data: expiredAds, error: fetchError } = await supabaseAdmin
+      .from('ads')
+      .select('id, title, user_id, expire_at')
+      .eq('status', 'published')
+      .lte('expire_at', now)
+      .order('expire_at', { ascending: true })
+      .limit(100);
+
+    if (fetchError) throw fetchError;
+
+    if (!expiredAds || expiredAds.length === 0) {
       return NextResponse.json({
         success: true,
         message: 'No ads to expire',
@@ -38,7 +42,7 @@ export async function GET(req: NextRequest) {
 
     const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
 
-    for (const ad of expiredAds.rows) {
+    for (const ad of expiredAds) {
       try {
         await transitionAdStatus({
           adId: ad.id,
@@ -48,16 +52,15 @@ export async function GET(req: NextRequest) {
         });
 
         // Notify the owner
-        await db.query(
-          `INSERT INTO notifications (user_id, title, message, type, link)
-           VALUES ($1, $2, $3, 'ad_expired', $4)`,
-          [
-            ad.user_id,
-            'Your ad has expired',
-            `"${ad.title}" has expired. You can renew it by selecting a new package.`,
-            `/ads/${ad.id}`,
-          ]
-        );
+        await supabaseAdmin
+          .from('notifications')
+          .insert({
+            user_id: ad.user_id,
+            title: 'Your ad has expired',
+            message: `"${ad.title}" has expired. You can renew it by selecting a new package.`,
+            type: 'ad_expired',
+            link: `/ads/${ad.id}`
+          });
 
         results.push({ adId: ad.id, title: ad.title, success: true });
       } catch (err: any) {
@@ -69,15 +72,14 @@ export async function GET(req: NextRequest) {
     const expired = results.filter(r => r.success).length;
     const failed  = results.filter(r => !r.success).length;
 
-    await db.query(
-      `INSERT INTO system_health_logs (source, response_ms, status, details)
-       VALUES ('cron/expire-ads', $1, $2, $3)`,
-      [
-        Date.now() - startTime,
-        failed === 0 ? 'ok' : 'warning',
-        JSON.stringify({ expired, failed, total: expiredAds.rows.length }),
-      ]
-    );
+    await supabaseAdmin
+      .from('system_health_logs')
+      .insert({
+        source: 'cron/expire-ads',
+        response_ms: Date.now() - startTime,
+        status: failed === 0 ? 'ok' : 'warning',
+        details: { expired, failed, total: expiredAds.length }
+      });
 
     return NextResponse.json({
       success: true,
@@ -89,11 +91,14 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error('Cron expire-ads error:', error);
 
-    await db.query(
-      `INSERT INTO system_health_logs (source, response_ms, status, details)
-       VALUES ('cron/expire-ads', $1, 'error', $2)`,
-      [Date.now() - startTime, JSON.stringify({ error: error.message })]
-    ).catch(() => {});
+    await supabaseAdmin
+      .from('system_health_logs')
+      .insert({
+        source: 'cron/expire-ads',
+        response_ms: Date.now() - startTime,
+        status: 'error',
+        details: { error: error.message }
+      }).catch(() => {});
 
     return NextResponse.json(
       { success: false, error: error.message },

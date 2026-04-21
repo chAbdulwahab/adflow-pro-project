@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { requireAuth } from '@/lib/auth';
 import { adCreateSchema } from '@/lib/validators';
 import { generateUniqueSlug } from '@/lib/slug';
@@ -23,61 +23,90 @@ export async function POST(req: NextRequest) {
 
     const { title, description, price, category_id, city_name, package_id, media_urls } = parsed.data;
 
-    // 1. Verify category, package all exist and are active
-    const [catCheck, pkgCheck] = await Promise.all([
-      db.query('SELECT id FROM categories WHERE id = $1 AND is_active = true', [category_id]),
-      db.query('SELECT id FROM packages WHERE id = $1 AND is_active = true', [package_id]),
+    // 1. Verify category, package all exist and are active using Supabase
+    const [{ data: category }, { data: pkg }] = await Promise.all([
+      supabaseAdmin.from('categories').select('id').eq('id', category_id).eq('is_active', true).maybeSingle(),
+      supabaseAdmin.from('packages').select('id').eq('id', package_id).eq('is_active', true).maybeSingle(),
     ]);
 
-    if (catCheck.rows.length === 0)  return errorResponse('Invalid or inactive category', 422);
-    if (pkgCheck.rows.length === 0)  return errorResponse('Invalid or inactive package', 422);
+    if (!category) return errorResponse('Invalid or inactive category', 422);
+    if (!pkg)      return errorResponse('Invalid or inactive package', 422);
 
     // 2. Handle City (Auto-create if doesn't exist)
     let final_city_id: string;
-    const cityCheck = await db.query('SELECT id FROM cities WHERE name ILIKE $1', [city_name]);
-    if (cityCheck.rows.length > 0) {
-      final_city_id = cityCheck.rows[0].id;
+    const { data: existingCity } = await supabaseAdmin
+      .from('cities')
+      .select('id')
+      .ilike('name', city_name)
+      .maybeSingle();
+
+    if (existingCity) {
+      final_city_id = existingCity.id;
     } else {
       const citySlug = generateUniqueSlug(city_name);
-      const newCity = await db.query(
-        'INSERT INTO cities (name, slug) VALUES ($1, $2) RETURNING id',
-        [city_name, citySlug]
-      );
-      final_city_id = newCity.rows[0].id;
+      const { data: newCity, error: cityError } = await supabaseAdmin
+        .from('cities')
+        .insert({ name: city_name, slug: citySlug })
+        .select('id')
+        .single();
+      
+      if (cityError) throw cityError;
+      final_city_id = newCity.id;
     }
 
     // 3. Generate unique slug
     const slug = generateUniqueSlug(title);
 
     // 4. Insert the ad (status defaults to 'draft')
-    const adResult = await db.query(
-      `INSERT INTO ads (user_id, package_id, category_id, city_id, title, slug, description, price)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
-      [actor.id, package_id, category_id, final_city_id, title, slug, description, price ?? null]
-    );
-    const ad = adResult.rows[0];
+    const { data: ad, error: adError } = await supabaseAdmin
+      .from('ads')
+      .insert({
+        user_id: actor.id,
+        package_id,
+        category_id,
+        city_id: final_city_id,
+        title,
+        slug,
+        description,
+        price: price ?? null
+      })
+      .select('*')
+      .single();
+
+    if (adError) throw adError;
 
     // 4. Normalize and insert media URLs
     const normalizedMedia = normalizeMediaUrls(media_urls);
-    const mediaInserts = normalizedMedia.map((m, index) =>
-      db.query(
-        `INSERT INTO ad_media (ad_id, source_type, original_url, normalized_thumbnail_url, validation_status, display_order)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [ad.id, m.source_type, m.original_url, m.normalized_thumbnail_url, m.validation_status, index]
-      )
-    );
-    await Promise.all(mediaInserts);
+    const mediaToInsert = normalizedMedia.map((m, index) => ({
+      ad_id: ad.id,
+      source_type: m.source_type,
+      original_url: m.original_url,
+      normalized_thumbnail_url: m.normalized_thumbnail_url,
+      validation_status: m.validation_status,
+      display_order: index
+    }));
+
+    if (mediaToInsert.length > 0) {
+      const { error: mediaError } = await supabaseAdmin
+        .from('ad_media')
+        .insert(mediaToInsert);
+      if (mediaError) throw mediaError;
+    }
 
     // 5. Log creation to audit_logs
-    await db.query(
-      `INSERT INTO audit_logs (actor_id, action_type, target_type, target_id, new_value)
-       VALUES ($1, 'ad_created', 'ad', $2, $3)`,
-      [actor.id, ad.id, JSON.stringify({ title, status: 'draft' })]
-    );
+    await supabaseAdmin
+      .from('audit_logs')
+      .insert({
+        actor_id: actor.id,
+        action_type: 'ad_created',
+        target_type: 'ad',
+        target_id: ad.id,
+        new_value: { title, status: 'draft' }
+      });
 
     return successResponse({ message: 'Ad created as draft', ad }, 201);
   } catch (error: any) {
+    console.error('Ad creation error:', error);
     return handleAuthError(error);
   }
 }
@@ -89,20 +118,31 @@ export async function GET(req: NextRequest) {
   try {
     const actor = requireAuth(req);
 
-    const result = await db.query(
-      `SELECT a.id, a.title, a.slug, a.status, a.price, a.is_featured,
-              a.created_at, a.updated_at,
-              c.name AS category_name, ct.name AS city_name, p.name AS package_name
-       FROM ads a
-       LEFT JOIN categories c  ON a.category_id = c.id
-       LEFT JOIN cities ct     ON a.city_id = ct.id
-       LEFT JOIN packages p    ON a.package_id = p.id
-       WHERE a.user_id = $1
-       ORDER BY a.created_at DESC`,
-      [actor.id]
-    );
+    const { data: ads, error } = await supabaseAdmin
+      .from('ads')
+      .select(`
+        id, title, slug, status, price, is_featured, created_at, updated_at,
+        categories ( name ),
+        cities ( name ),
+        packages ( name )
+      `)
+      .eq('user_id', actor.id)
+      .order('created_at', { ascending: false });
 
-    return successResponse({ ads: result.rows, total: result.rows.length });
+    if (error) throw error;
+
+    // Flatten relations to match previous structure
+    const flattenedAds = ads.map(ad => ({
+      ...ad,
+      category_name: ad.categories?.name,
+      city_name:     ad.cities?.name,
+      package_name:  ad.packages?.name,
+      categories: undefined,
+      cities:     undefined,
+      packages:   undefined
+    }));
+
+    return successResponse({ ads: flattenedAds, total: flattenedAds.length });
   } catch (error: any) {
     return handleAuthError(error);
   }

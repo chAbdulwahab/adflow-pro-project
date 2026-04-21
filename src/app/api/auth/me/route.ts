@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { requireAuth } from '@/lib/auth';
 import { profileUpdateSchema } from '@/lib/validators';
 import { successResponse, errorResponse, handleAuthError } from '@/lib/api-response';
@@ -9,21 +9,36 @@ export async function GET(req: NextRequest) {
     // Require auth
     const authUser = requireAuth(req);
 
-    // Fetch fresh user data from DB
-    const result = await db.query(
-      `SELECT u.id, u.name, u.email, u.role, u.status, u.created_at,
-              sp.display_name, sp.business_name, sp.phone, sp.city, sp.is_verified
-       FROM users u
-       LEFT JOIN seller_profiles sp ON sp.user_id = u.id
-       WHERE u.id = $1`,
-      [authUser.id]
-    );
+    // Fetch fresh user data from DB using Supabase
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select(`
+        id, name, email, role, status, created_at,
+        seller_profiles (
+          display_name, business_name, phone, city, is_verified
+        )
+      `)
+      .eq('id', authUser.id)
+      .maybeSingle();
 
-    if (result.rows.length === 0) {
+    if (error) throw error;
+
+    if (!user) {
       return successResponse({ user: null }, 404);
     }
 
-    return successResponse({ user: result.rows[0] });
+    // Flatten the user object to match the previous structure if needed
+    const userResponse = {
+      ...user,
+      display_name: user.seller_profiles?.display_name,
+      business_name: user.seller_profiles?.business_name,
+      phone: user.seller_profiles?.phone,
+      city: user.seller_profiles?.city,
+      is_verified: user.seller_profiles?.is_verified,
+      seller_profiles: undefined
+    };
+
+    return successResponse({ user: userResponse });
   } catch (error: any) {
     return handleAuthError(error);
   }
@@ -44,34 +59,28 @@ export async function PUT(req: NextRequest) {
 
     const { name, phone, city, business_name } = parsed.data;
 
-    // Start a transaction since we update two tables
-    const client = await db.pool.connect();
-    try {
-      await client.query('BEGIN');
+    // Update users table
+    const { error: userError } = await supabaseAdmin
+      .from('users')
+      .update({ name, updated_at: new Date().toISOString() })
+      .eq('id', authUser.id);
 
-      // Update users table
-      await client.query(
-        `UPDATE users SET name = $1, updated_at = NOW() WHERE id = $2`,
-        [name, authUser.id]
-      );
+    if (userError) throw userError;
 
-      // Update seller_profiles table
-      await client.query(
-        `UPDATE seller_profiles 
-         SET display_name = $1, phone = $2, city = $3, business_name = $4
-         WHERE user_id = $5`,
-        [name, phone, city, business_name || null, authUser.id]
-      );
+    // Update seller_profiles table
+    const { error: profileError } = await supabaseAdmin
+      .from('seller_profiles')
+      .update({
+        display_name: name,
+        phone,
+        city,
+        business_name: business_name || null
+      })
+      .eq('user_id', authUser.id);
 
-      await client.query('COMMIT');
+    if (profileError) throw profileError;
 
-      return successResponse({ message: 'Profile updated successfully' });
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
+    return successResponse({ message: 'Profile updated successfully' });
   } catch (error: any) {
     console.error('Profile update error:', error);
     return handleAuthError(error);

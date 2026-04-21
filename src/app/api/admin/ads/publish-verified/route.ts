@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { requireRole } from '@/lib/auth';
 import { transitionAdStatus } from '@/lib/status-machine';
 import { calculateRankScore } from '@/lib/rank';
@@ -14,49 +14,54 @@ export async function POST(req: NextRequest) {
   try {
     const actor = requireRole(req, 'admin', 'super_admin');
 
-    // Find all ads stuck at payment_verified
-    const stuckAds = await db.query(
-      `SELECT
-         a.id, a.title, a.user_id, a.admin_boost,
-         pkg.duration_days,
-         pkg.is_featured  AS pkg_is_featured,
-         pkg.weight       AS pkg_weight,
-         sp.is_verified   AS seller_verified
-       FROM ads a
-       LEFT JOIN packages pkg        ON a.package_id = pkg.id
-       LEFT JOIN seller_profiles sp  ON sp.user_id   = a.user_id
-       WHERE a.status = 'payment_verified'
-       ORDER BY a.updated_at ASC`
-    );
+    // Find all ads stuck at payment_verified using Supabase
+    const { data: stuckAds, error: fetchError } = await supabaseAdmin
+      .from('ads')
+      .select(`
+        id, title, user_id, admin_boost,
+        packages ( duration_days, is_featured, weight ),
+        seller_profiles!user_id ( is_verified )
+      `)
+      .eq('status', 'payment_verified')
+      .order('updated_at', { ascending: true });
 
-    if (stuckAds.rows.length === 0) {
+    if (fetchError) throw fetchError;
+
+    if (!stuckAds || stuckAds.length === 0) {
       return successResponse({ message: 'No ads stuck at payment_verified.', published: 0 });
     }
 
     const results: { adId: string; title: string; success: boolean; error?: string }[] = [];
 
-    for (const ad of stuckAds.rows) {
+    for (const ad of stuckAds) {
       try {
-        const durationDays: number = ad.duration_days ?? 30;
+        const pkg = ad.packages;
+        const durationDays: number = pkg?.duration_days ?? 30;
         const publishAt  = new Date();
         const expireAt   = new Date(publishAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
-        const isFeatured: boolean = ad.pkg_is_featured ?? false;
+        const isFeatured: boolean = pkg?.is_featured ?? false;
 
         const rankScore = calculateRankScore({
           is_featured:        isFeatured,
-          package_weight:     ad.pkg_weight ?? 1,
+          package_weight:     pkg?.weight ?? 1,
           publish_at:         publishAt,
           admin_boost:        ad.admin_boost ?? 0,
-          seller_is_verified: ad.seller_verified ?? false,
+          seller_is_verified: ad.seller_profiles?.is_verified ?? false,
         });
 
         // Set dates & features
-        await db.query(
-          `UPDATE ads
-           SET publish_at = $1, expire_at = $2, is_featured = $3, rank_score = $4, updated_at = NOW()
-           WHERE id = $5`,
-          [publishAt, expireAt, isFeatured, rankScore, ad.id]
-        );
+        const { error: updateError } = await supabaseAdmin
+          .from('ads')
+          .update({
+            publish_at: publishAt.toISOString(),
+            expire_at:  expireAt.toISOString(),
+            is_featured: isFeatured,
+            rank_score:  rankScore,
+            updated_at:  new Date().toISOString()
+          })
+          .eq('id', ad.id);
+        
+        if (updateError) throw updateError;
 
         // Transition to published
         await transitionAdStatus({
@@ -67,16 +72,15 @@ export async function POST(req: NextRequest) {
         });
 
         // Notify owner
-        await db.query(
-          `INSERT INTO notifications (user_id, title, message, type, link)
-           VALUES ($1, $2, $3, 'ad_published', $4)`,
-          [
-            ad.user_id,
-            '🎉 Your ad is now live!',
-            `Your ad "${ad.title}" has been published and is now publicly visible.`,
-            `/ads/${ad.id}`,
-          ]
-        );
+        await supabaseAdmin
+          .from('notifications')
+          .insert({
+            user_id: ad.user_id,
+            title: '🎉 Your ad is now live!',
+            message: `Your ad "${ad.title}" has been published and is now publicly visible.`,
+            type: 'ad_published',
+            link: `/ads/${ad.id}`
+          });
 
         results.push({ adId: ad.id, title: ad.title, success: true });
       } catch (err: any) {

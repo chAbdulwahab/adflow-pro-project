@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { requireAuth } from '@/lib/auth';
 import { successResponse, errorResponse, handleAuthError } from '@/lib/api-response';
 
@@ -15,19 +15,21 @@ export async function PATCH(
     const { id: notifId } = await params;
 
     // Only allow marking own notifications
-    const result = await db.query(
-      `UPDATE notifications
-       SET is_read = true
-       WHERE id = $1 AND user_id = $2
-       RETURNING id, is_read`,
-      [notifId, actor.id]
-    );
+    const { data: updated, error } = await supabaseAdmin
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notifId)
+      .eq('user_id', actor.id)
+      .select('id, is_read')
+      .maybeSingle();
 
-    if (result.rowCount === 0) {
+    if (error) throw error;
+
+    if (!updated) {
       return errorResponse('Notification not found or access denied', 404);
     }
 
-    return successResponse({ message: 'Notification marked as read', notification: result.rows[0] });
+    return successResponse({ message: 'Notification marked as read', notification: updated });
   } catch (error: any) {
     return handleAuthError(error);
   }
@@ -44,12 +46,17 @@ export async function DELETE(
     const actor = requireAuth(req);
     const { id: notifId } = await params;
 
-    const result = await db.query(
-      'DELETE FROM notifications WHERE id = $1 AND user_id = $2 RETURNING id',
-      [notifId, actor.id]
-    );
+    const { data: deleted, error } = await supabaseAdmin
+      .from('notifications')
+      .delete()
+      .eq('id', notifId)
+      .eq('user_id', actor.id)
+      .select('id')
+      .maybeSingle();
 
-    if (result.rowCount === 0) {
+    if (error) throw error;
+
+    if (!deleted) {
       return errorResponse('Notification not found or access denied', 404);
     }
 

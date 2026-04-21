@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { requireRole } from '@/lib/auth';
 import { successResponse, errorResponse, handleAuthError } from '@/lib/api-response';
 
@@ -23,37 +23,43 @@ export async function GET(req: NextRequest) {
       return errorResponse(`status must be one of: ${allowedStatuses.join(', ')}`, 400);
     }
 
-    const [paymentsResult, countResult] = await Promise.all([
-      db.query(
-        `SELECT
-           p.id, p.amount, p.method, p.transaction_ref, p.sender_name,
-           p.screenshot_url, p.status, p.rejection_note, p.created_at,
-           p.verified_at,
-           a.id         AS ad_id,
-           a.title      AS ad_title,
-           a.status     AS ad_status,
-           pkg.name     AS package_name,
-           pkg.price    AS package_price,
-           u.name       AS owner_name,
-           u.email      AS owner_email,
-           verifier.name AS verified_by_name
-         FROM payments p
-         JOIN ads a      ON p.ad_id     = a.id
-         JOIN users u    ON a.user_id   = u.id
-         LEFT JOIN packages pkg   ON a.package_id  = pkg.id
-         LEFT JOIN users verifier ON p.verified_by = verifier.id
-         WHERE p.status = $1
-         ORDER BY p.created_at ASC
-         LIMIT $2 OFFSET $3`,
-        [status, limit, offset]
-      ),
-      db.query('SELECT COUNT(*) AS total FROM payments WHERE status = $1', [status]),
-    ]);
+    const { data: paymentsRes, count, error } = await supabaseAdmin
+      .from('payments')
+      .select(`
+        id, amount, method, transaction_ref, sender_name,
+        screenshot_url, status, rejection_note, created_at,
+        verified_at,
+        ads!inner (
+          id, title, status,
+          packages ( name, price ),
+          users!inner ( name, email )
+        ),
+        users!verified_by ( name )
+      `, { count: 'exact' })
+      .eq('status', status)
+      .order('created_at', { ascending: true })
+      .range(offset, offset + limit - 1);
 
-    const total = parseInt(countResult.rows[0].total);
+    if (error) throw error;
+
+    const total = count || 0;
+
+    const payments = (paymentsRes || []).map(p => ({
+      ...p,
+      ad_id: p.ads?.id,
+      ad_title: p.ads?.title,
+      ad_status: p.ads?.status,
+      package_name: p.ads?.packages?.name,
+      package_price: p.ads?.packages?.price,
+      owner_name: p.ads?.users?.name,
+      owner_email: p.ads?.users?.email,
+      verified_by_name: p.users?.name,
+      ads: undefined,
+      users: undefined
+    }));
 
     return successResponse({
-      payments: paymentsResult.rows,
+      payments,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
   } catch (error: any) {

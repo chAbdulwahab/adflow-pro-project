@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { requireAuth } from '@/lib/auth';
 import { transitionAdStatus } from '@/lib/status-machine';
 import { successResponse, errorResponse, handleAuthError } from '@/lib/api-response';
@@ -16,17 +16,17 @@ export async function POST(
     const actor = requireAuth(req);
     const { id: adId } = await params;
 
-    // 1. Verify ad belongs to this user and is a draft
-    const adResult = await db.query(
-      'SELECT id, status, user_id FROM ads WHERE id = $1',
-      [adId]
-    );
+    // 1. Verify ad belongs to this user and is a draft using Supabase
+    const { data: ad, error: adError } = await supabaseAdmin
+      .from('ads')
+      .select('id, status, user_id')
+      .eq('id', adId)
+      .maybeSingle();
 
-    if (adResult.rows.length === 0) {
+    if (adError) throw adError;
+    if (!ad) {
       return errorResponse('Ad not found', 404);
     }
-
-    const ad = adResult.rows[0];
 
     if (ad.user_id !== actor.id) {
       return errorResponse('You do not own this ad', 403);
@@ -37,16 +37,15 @@ export async function POST(
     }
 
     // 2. Verify the ad has at least one valid media item
-    const mediaCheck = await db.query(
-      `SELECT
-         COUNT(*) FILTER (WHERE validation_status = 'valid')   AS valid_count,
-         COUNT(*) FILTER (WHERE validation_status = 'invalid') AS invalid_count
-       FROM ad_media WHERE ad_id = $1`,
-      [adId]
-    );
+    const { data: media, error: mediaError } = await supabaseAdmin
+      .from('ad_media')
+      .select('validation_status')
+      .eq('ad_id', adId);
+    
+    if (mediaError) throw mediaError;
 
-    const validCount   = parseInt(mediaCheck.rows[0].valid_count);
-    const invalidCount = parseInt(mediaCheck.rows[0].invalid_count);
+    const validCount = (media || []).filter(m => m.validation_status === 'valid').length;
+    const invalidCount = (media || []).filter(m => m.validation_status === 'invalid').length;
 
     if (validCount === 0) {
       const hint = invalidCount > 0
@@ -65,17 +64,16 @@ export async function POST(
       ipAddress: req.headers.get('x-forwarded-for') ?? undefined,
     });
 
-    // 4. Notify the user (optional — insert a notification row)
-    await db.query(
-      `INSERT INTO notifications (user_id, title, message, type, link)
-       VALUES ($1, $2, $3, 'ad_submitted', $4)`,
-      [
-        actor.id,
-        'Ad submitted for review',
-        'Your ad has been submitted and is awaiting moderator review.',
-        `/ads/${adId}`,
-      ]
-    );
+    // 4. Notify the user
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: actor.id,
+        title: 'Ad submitted for review',
+        message: 'Your ad has been submitted and is awaiting moderator review.',
+        type: 'ad_submitted',
+        link: `/ads/${adId}`
+      });
 
     return successResponse({
       message: 'Ad submitted for review',

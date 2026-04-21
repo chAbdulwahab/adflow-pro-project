@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import { requireAuth } from '@/lib/auth';
 import { paymentSubmitSchema } from '@/lib/validators';
 import { transitionAdStatus } from '@/lib/status-machine';
@@ -28,15 +28,15 @@ export async function POST(
 
     const { amount, method, transaction_ref, sender_name, screenshot_url } = parsed.data;
 
-    // 2. Verify ad belongs to this user and is payment_pending
-    const adResult = await db.query(
-      'SELECT id, status, user_id, package_id FROM ads WHERE id = $1',
-      [adId]
-    );
+    // 2. Verify ad belongs to this user and is payment_pending using Supabase
+    const { data: ad, error: adError } = await supabaseAdmin
+      .from('ads')
+      .select('id, status, user_id, package_id')
+      .eq('id', adId)
+      .maybeSingle();
 
-    if (adResult.rows.length === 0) return errorResponse('Ad not found', 404);
-
-    const ad = adResult.rows[0];
+    if (adError) throw adError;
+    if (!ad) return errorResponse('Ad not found', 404);
 
     if (ad.user_id !== actor.id) return errorResponse('You do not own this ad', 403);
 
@@ -48,22 +48,33 @@ export async function POST(
     }
 
     // 3. Block duplicate transaction references
-    const dupCheck = await db.query(
-      'SELECT id FROM payments WHERE transaction_ref = $1',
-      [transaction_ref]
-    );
-    if (dupCheck.rows.length > 0) {
+    const { data: dupCheck, error: dupError } = await supabaseAdmin
+      .from('payments')
+      .select('id')
+      .eq('transaction_ref', transaction_ref)
+      .maybeSingle();
+    
+    if (dupError && dupError.code !== 'PGRST116') throw dupError; // PGRST116 is no rows returned for maybeSingle
+
+    if (dupCheck) {
       return errorResponse('This transaction reference has already been used', 409);
     }
 
     // 4. Insert payment record
-    const paymentResult = await db.query(
-      `INSERT INTO payments (ad_id, amount, method, transaction_ref, sender_name, screenshot_url)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [adId, amount, method, transaction_ref, sender_name, screenshot_url ?? null]
-    );
-    const payment = paymentResult.rows[0];
+    const { data: payment, error: pInsertError } = await supabaseAdmin
+      .from('payments')
+      .insert({
+        ad_id: adId,
+        amount,
+        method,
+        transaction_ref,
+        sender_name,
+        screenshot_url: screenshot_url ?? null
+      })
+      .select()
+      .single();
+    
+    if (pInsertError) throw pInsertError;
 
     // 5. Transition ad status: payment_pending → payment_submitted
     await transitionAdStatus({
@@ -75,16 +86,15 @@ export async function POST(
     });
 
     // 6. Notify the user
-    await db.query(
-      `INSERT INTO notifications (user_id, title, message, type, link)
-       VALUES ($1, $2, $3, 'payment_submitted', $4)`,
-      [
-        actor.id,
-        'Payment submitted for verification',
-        `Your payment of PKR ${amount} via ${method} is under review. Reference: ${transaction_ref}`,
-        `/ads/${adId}`,
-      ]
-    );
+    await supabaseAdmin
+      .from('notifications')
+      .insert({
+        user_id: actor.id,
+        title: 'Payment submitted for verification',
+        message: `Your payment of PKR ${amount} via ${method} is under review. Reference: ${transaction_ref}`,
+        type: 'payment_submitted',
+        link: `/ads/${adId}`
+      });
 
     return successResponse({ message: 'Payment submitted for verification', payment }, 201);
   } catch (error: any) {
@@ -106,19 +116,25 @@ export async function GET(
     const actor = requireAuth(req);
     const { id: adId } = await params;
 
-    const adCheck = await db.query(
-      'SELECT id, user_id FROM ads WHERE id = $1',
-      [adId]
-    );
-    if (adCheck.rows.length === 0) return errorResponse('Ad not found', 404);
-    if (adCheck.rows[0].user_id !== actor.id) return errorResponse('Forbidden', 403);
+    const { data: ad, error: adError } = await supabaseAdmin
+      .from('ads')
+      .select('id, user_id')
+      .eq('id', adId)
+      .maybeSingle();
 
-    const result = await db.query(
-      'SELECT * FROM payments WHERE ad_id = $1 ORDER BY created_at DESC',
-      [adId]
-    );
+    if (adError) throw adError;
+    if (!ad) return errorResponse('Ad not found', 404);
+    if (ad.user_id !== actor.id) return errorResponse('Forbidden', 403);
 
-    return successResponse({ payments: result.rows });
+    const { data: payments, error: pError } = await supabaseAdmin
+      .from('payments')
+      .select('*')
+      .eq('ad_id', adId)
+      .order('created_at', { ascending: false });
+    
+    if (pError) throw pError;
+
+    return successResponse({ payments: payments || [] });
   } catch (error: any) {
     return handleAuthError(error);
   }
