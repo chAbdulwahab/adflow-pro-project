@@ -52,11 +52,13 @@ export async function POST(
     if (paymentError) throw paymentError;
     if (!payment) return errorResponse('Payment not found', 404);
 
-    const adStatus = payment.ads?.status;
-    const adOwnerId = payment.ads?.user_id;
-    const adPackage = payment.ads?.packages;
-    const adIsFeatured = payment.ads?.is_featured;
-    const sellerVerified = payment.ads?.seller_profiles?.is_verified;
+    const ad = Array.isArray(payment.ads) ? payment.ads[0] : payment.ads;
+    const adStatus = ad?.status;
+    const adOwnerId = ad?.user_id;
+    const adPackage = Array.isArray(ad?.packages) ? ad.packages[0] : ad?.packages;
+    const adIsFeatured = ad?.is_featured;
+    const sellerProf = Array.isArray(ad?.seller_profiles) ? ad.seller_profiles[0] : ad?.seller_profiles;
+    const sellerVerified = sellerProf?.is_verified;
 
     if (payment.status !== 'pending') {
       return errorResponse(

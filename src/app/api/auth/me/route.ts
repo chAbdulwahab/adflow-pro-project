@@ -28,13 +28,14 @@ export async function GET(req: NextRequest) {
     }
 
     // Flatten the user object to match the previous structure if needed
+    const sellerProf = Array.isArray(user.seller_profiles) ? user.seller_profiles[0] : user.seller_profiles;
     const userResponse = {
       ...user,
-      display_name: user.seller_profiles?.display_name,
-      business_name: user.seller_profiles?.business_name,
-      phone: user.seller_profiles?.phone,
-      city: user.seller_profiles?.city,
-      is_verified: user.seller_profiles?.is_verified,
+      display_name: sellerProf?.display_name,
+      business_name: sellerProf?.business_name,
+      phone: sellerProf?.phone,
+      city: sellerProf?.city,
+      is_verified: sellerProf?.is_verified,
       seller_profiles: undefined
     };
 

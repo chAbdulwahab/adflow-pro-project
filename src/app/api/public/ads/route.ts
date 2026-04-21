@@ -10,17 +10,17 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
 
-    const q        = searchParams.get('q')?.trim() ?? '';
+    const q = searchParams.get('q')?.trim() ?? '';
     const category = searchParams.get('category')?.trim() ?? '';
-    const city     = searchParams.get('city')?.trim() ?? '';
+    const city = searchParams.get('city')?.trim() ?? '';
     const minPrice = parseFloat(searchParams.get('min_price') ?? '0') || 0;
     const maxPrice = parseFloat(searchParams.get('max_price') ?? '0') || 0;
     const featured = searchParams.get('featured') === 'true';
-    const pkg      = searchParams.get('package')?.trim() ?? '';
-    const sort     = searchParams.get('sort') ?? 'rank_score';
-    const page     = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
-    const limit    = Math.min(50, parseInt(searchParams.get('limit') ?? '20'));
-    const offset   = (page - 1) * limit;
+    const pkg = searchParams.get('package')?.trim() ?? '';
+    const sort = searchParams.get('sort') ?? 'rank_score';
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
+    const limit = Math.min(50, parseInt(searchParams.get('limit') ?? '20'));
+    const offset = (page - 1) * limit;
 
     const now = new Date().toISOString();
 
@@ -96,8 +96,9 @@ export async function GET(req: NextRequest) {
         ?.normalized_thumbnail_url;
 
       // Extract seller info from users/seller_profiles
-      const sellerProfile = ad.users?.seller_profiles?.[0];
-      const sellerDisplayName = sellerProfile?.display_name || ad.users?.name;
+      const user = Array.isArray(ad.users) ? ad.users[0] : ad.users;
+      const sellerProfile = Array.isArray(user?.seller_profiles) ? user.seller_profiles[0] : user?.seller_profiles;
+      const sellerDisplayName = sellerProfile?.display_name || user?.name;
       const sellerVerified = sellerProfile?.is_verified || false;
 
       return {
@@ -110,11 +111,11 @@ export async function GET(req: NextRequest) {
         publish_at: ad.publish_at,
         expire_at: ad.expire_at,
         created_at: ad.created_at,
-        category_name: ad.categories?.name,
-        category_slug: ad.categories?.slug,
-        city_name: ad.cities?.name,
-        city_slug: ad.cities?.slug,
-        package_name: ad.packages?.name,
+        category_name: (Array.isArray(ad.categories) ? ad.categories[0] : ad.categories)?.name,
+        category_slug: (Array.isArray(ad.categories) ? ad.categories[0] : ad.categories)?.slug,
+        city_name: (Array.isArray(ad.cities) ? ad.cities[0] : ad.cities)?.name,
+        city_slug: (Array.isArray(ad.cities) ? ad.cities[0] : ad.cities)?.slug,
+        package_name: (Array.isArray(ad.packages) ? ad.packages[0] : ad.packages)?.name,
         seller_name: sellerDisplayName,
         seller_verified: sellerVerified,
         thumbnail

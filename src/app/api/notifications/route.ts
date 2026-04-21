@@ -61,18 +61,20 @@ export async function PATCH(req: NextRequest) {
   try {
     const actor = requireAuth(req);
 
-    const { data, error, count } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('notifications')
       .update({ is_read: true })
       .eq('user_id', actor.id)
       .eq('is_read', false)
-      .select('id', { count: 'exact' });
+      .select('id');
 
     if (error) throw error;
 
+    const updatedCount = data?.length || 0;
+
     return successResponse({
-      message: `Marked ${count || 0} notifications as read`,
-      updated: count || 0,
+      message: `Marked ${updatedCount} notifications as read`,
+      updated: updatedCount,
     });
   } catch (error: any) {
     return handleAuthError(error);

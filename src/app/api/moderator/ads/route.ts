@@ -48,27 +48,28 @@ export async function GET(req: NextRequest) {
     const total = count || 0;
 
     const processedAds = (adsResult || []).map(ad => {
-       const thumbnail = ad.ad_media
-        ?.filter((m: any) => m.validation_status === 'valid')
-        ?.sort((a: any, b: any) => a.display_order - b.display_order)?.[0]
-        ?.normalized_thumbnail_url;
-
-       return {
-         ...ad,
-         owner_name: ad.users?.name,
-         owner_email: ad.users?.email,
-         category_name: ad.categories?.name,
-         city_name: ad.cities?.name,
-         package_name: ad.packages?.name,
-         package_price: ad.packages?.price,
-         seller_verified: ad.users?.seller_profiles?.[0]?.is_verified || false,
-         thumbnail,
-         users: undefined,
-         categories: undefined,
-         cities: undefined,
-         packages: undefined,
-         ad_media: undefined
-       };
+        const user = Array.isArray(ad.users) ? ad.users[0] : ad.users;
+        const thumbnail = ad.ad_media
+         ?.filter((m: any) => m.validation_status === 'valid')
+         ?.sort((a: any, b: any) => a.display_order - b.display_order)?.[0]
+         ?.normalized_thumbnail_url;
+ 
+        return {
+          ...ad,
+          owner_name: user?.name,
+          owner_email: user?.email,
+          category_name: (Array.isArray(ad.categories) ? ad.categories[0] : ad.categories)?.name,
+          city_name: (Array.isArray(ad.cities) ? ad.cities[0] : ad.cities)?.name,
+          package_name: (Array.isArray(ad.packages) ? ad.packages[0] : ad.packages)?.name,
+          package_price: (Array.isArray(ad.packages) ? ad.packages[0] : ad.packages)?.price,
+          seller_verified: (Array.isArray(user?.seller_profiles) ? user.seller_profiles[0] : user?.seller_profiles)?.is_verified || false,
+          thumbnail,
+          users: undefined,
+          categories: undefined,
+          cities: undefined,
+          packages: undefined,
+          ad_media: undefined
+        };
     });
 
     return successResponse({

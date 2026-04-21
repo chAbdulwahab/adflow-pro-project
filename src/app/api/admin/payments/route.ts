@@ -44,19 +44,26 @@ export async function GET(req: NextRequest) {
 
     const total = count || 0;
 
-    const payments = (paymentsRes || []).map(p => ({
-      ...p,
-      ad_id: p.ads?.id,
-      ad_title: p.ads?.title,
-      ad_status: p.ads?.status,
-      package_name: p.ads?.packages?.name,
-      package_price: p.ads?.packages?.price,
-      owner_name: p.ads?.users?.name,
-      owner_email: p.ads?.users?.email,
-      verified_by_name: p.users?.name,
-      ads: undefined,
-      users: undefined
-    }));
+    const payments = (paymentsRes || []).map(p => {
+      const ad = Array.isArray(p.ads) ? p.ads[0] : p.ads;
+      const pkg = Array.isArray(ad?.packages) ? ad.packages[0] : ad?.packages;
+      const owner = Array.isArray(ad?.users) ? ad.users[0] : ad?.users;
+      const verifier = Array.isArray(p.users) ? p.users[0] : p.users;
+
+      return {
+        ...p,
+        ad_id: ad?.id,
+        ad_title: ad?.title,
+        ad_status: ad?.status,
+        package_name: pkg?.name,
+        package_price: pkg?.price,
+        owner_name: owner?.name,
+        owner_email: owner?.email,
+        verified_by_name: verifier?.name,
+        ads: undefined,
+        users: undefined
+      };
+    });
 
     return successResponse({
       payments,

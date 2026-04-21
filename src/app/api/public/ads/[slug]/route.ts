@@ -39,17 +39,21 @@ export async function GET(
     }
 
     // Flatten ad data
-    const sellerProfile = adData.users?.seller_profiles?.[0];
+    const user = Array.isArray(adData.users) ? adData.users[0] : adData.users;
+    const sellerProfile = Array.isArray(user?.seller_profiles) ? user.seller_profiles[0] : user?.seller_profiles;
+    const cat = Array.isArray(adData.categories) ? adData.categories[0] : adData.categories;
+    const cit = Array.isArray(adData.cities) ? adData.cities[0] : adData.cities;
+    const pkg = Array.isArray(adData.packages) ? adData.packages[0] : adData.packages;
 
     const ad = {
       ...adData,
-      category_name: adData.categories?.name,
-      category_slug: adData.categories?.slug,
-      city_name:     adData.cities?.name,
-      city_slug:     adData.cities?.slug,
-      package_name:  adData.packages?.name,
-      owner_name:    adData.users?.name,
-      seller_display_name:  sellerProfile?.display_name || adData.users?.name,
+      category_name: cat?.name,
+      category_slug: cat?.slug,
+      city_name:     cit?.name,
+      city_slug:     cit?.slug,
+      package_name:  pkg?.name,
+      owner_name:    user?.name,
+      seller_display_name:  sellerProfile?.display_name || user?.name,
       seller_business_name: sellerProfile?.business_name,
       seller_phone:         sellerProfile?.phone,
       seller_city:          sellerProfile?.city,
@@ -91,7 +95,7 @@ export async function GET(
 
     const relatedAds = (relatedData || []).map(r => ({
       ...r,
-      city_name: r.cities?.name,
+      city_name: (Array.isArray(r.cities) ? r.cities[0] : r.cities)?.name,
       thumbnail: r.ad_media?.[0]?.normalized_thumbnail_url,
       cities: undefined,
       ad_media: undefined

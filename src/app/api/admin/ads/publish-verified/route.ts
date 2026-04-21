@@ -35,18 +35,19 @@ export async function POST(req: NextRequest) {
 
     for (const ad of stuckAds) {
       try {
-        const pkg = ad.packages;
+        const pkg: any = Array.isArray(ad.packages) ? ad.packages[0] : ad.packages;
         const durationDays: number = pkg?.duration_days ?? 30;
         const publishAt  = new Date();
         const expireAt   = new Date(publishAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
         const isFeatured: boolean = pkg?.is_featured ?? false;
 
+        const sellerProf = Array.isArray(ad.seller_profiles) ? ad.seller_profiles[0] : ad.seller_profiles;
         const rankScore = calculateRankScore({
           is_featured:        isFeatured,
           package_weight:     pkg?.weight ?? 1,
           publish_at:         publishAt,
           admin_boost:        ad.admin_boost ?? 0,
-          seller_is_verified: ad.seller_profiles?.is_verified ?? false,
+          seller_is_verified: sellerProf?.is_verified ?? false,
         });
 
         // Set dates & features

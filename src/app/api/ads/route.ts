@@ -134,9 +134,9 @@ export async function GET(req: NextRequest) {
     // Flatten relations to match previous structure
     const flattenedAds = ads.map(ad => ({
       ...ad,
-      category_name: ad.categories?.name,
-      city_name:     ad.cities?.name,
-      package_name:  ad.packages?.name,
+      category_name: (Array.isArray(ad.categories) ? ad.categories[0] : ad.categories)?.name,
+      city_name:     (Array.isArray(ad.cities) ? ad.cities[0] : ad.cities)?.name,
+      package_name:  (Array.isArray(ad.packages) ? ad.packages[0] : ad.packages)?.name,
       categories: undefined,
       cities:     undefined,
       packages:   undefined

@@ -56,16 +56,18 @@ export async function POST(
       return errorResponse('Invalid publish_at date format. Use ISO8601 (e.g. 2025-05-01T10:00:00Z)', 400);
     }
 
-    const durationDays = ad.packages?.duration_days ?? 30;
+    const pkg = Array.isArray(ad.packages) ? ad.packages[0] : ad.packages;
+    const durationDays = pkg?.duration_days ?? 30;
     const expireAt = new Date(publishAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
     // 3. Calculate rank score
+    const sellerProf = Array.isArray(ad.seller_profiles) ? ad.seller_profiles[0] : ad.seller_profiles;
     const rankScore = calculateRankScore({
       is_featured:       ad.is_featured,
-      package_weight:    ad.packages?.weight ?? 1,
+      package_weight:    pkg?.weight ?? 1,
       publish_at:        publishAt,
       admin_boost:       ad.admin_boost ?? 0,
-      seller_is_verified: ad.seller_profiles?.is_verified ?? false,
+      seller_is_verified: sellerProf?.is_verified ?? false,
     });
 
     // 4. Determine target status

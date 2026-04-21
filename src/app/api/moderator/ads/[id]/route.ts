@@ -56,16 +56,17 @@ export async function GET(
     }
 
     // Flatten ad data
-    const sellerProfile = adRes.data.users?.seller_profiles?.[0];
+    const user = Array.isArray(adRes.data.users) ? adRes.data.users[0] : adRes.data.users;
+    const sellerProfile = Array.isArray(user?.seller_profiles) ? user.seller_profiles[0] : user?.seller_profiles;
 
     const ad = {
       ...adRes.data,
-      owner_name: adRes.data.users?.name,
-      owner_email: adRes.data.users?.email,
-      category_name: adRes.data.categories?.name,
-      city_name: adRes.data.cities?.name,
-      package_name: adRes.data.packages?.name,
-      package_price: adRes.data.packages?.price,
+      owner_name: user?.name,
+      owner_email: user?.email,
+      category_name: (Array.isArray(adRes.data.categories) ? adRes.data.categories[0] : adRes.data.categories)?.name,
+      city_name: (Array.isArray(adRes.data.cities) ? adRes.data.cities[0] : adRes.data.cities)?.name,
+      package_name: (Array.isArray(adRes.data.packages) ? adRes.data.packages[0] : adRes.data.packages)?.name,
+      package_price: (Array.isArray(adRes.data.packages) ? adRes.data.packages[0] : adRes.data.packages)?.price,
       seller_display_name: sellerProfile?.display_name || adRes.data.users?.name,
       seller_verified: sellerProfile?.is_verified || false,
       users: undefined,

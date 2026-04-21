@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
         response_ms: Date.now() - startTime,
         status: 'error',
         details: { error: error.message }
-      }).catch(() => {});
+      });
 
     return NextResponse.json(
       { success: false, error: error.message },

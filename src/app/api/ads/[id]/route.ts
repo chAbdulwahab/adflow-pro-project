@@ -47,11 +47,15 @@ export async function GET(
     if (mediaError) throw mediaError;
 
     // Flatten names
+    const cat = Array.isArray(ad.categories) ? ad.categories[0] : ad.categories;
+    const cit = Array.isArray(ad.cities) ? ad.cities[0] : ad.cities;
+    const pkg = Array.isArray(ad.packages) ? ad.packages[0] : ad.packages;
+
     const processedAd = {
        ...ad,
-       category_name: ad.categories?.name,
-       city_name: ad.cities?.name,
-       package_name: ad.packages?.name,
+       category_name: cat?.name,
+       city_name: cit?.name,
+       package_name: pkg?.name,
        categories: undefined,
        cities: undefined,
        packages: undefined,
