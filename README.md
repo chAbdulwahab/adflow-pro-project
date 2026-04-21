@@ -30,11 +30,7 @@
 <!-- These are placeholders for project screenshots to showcase the UI/UX -->
 
 <div align="center">
-  <img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/3176fef2-32e9-4233-962c-48ad220f3e72" />
-  <br />
-  <img src="https://via.placeholder.com/800x450/1e1b4b/cbd5e1?text=Marketplace+Explore+View" alt="Explore View" width="800" />
-  <br />
-  <img src="https://via.placeholder.com/800x450/1e1b4b/cbd5e1?text=Admin+Moderation+Queue" alt="Admin Panel" width="800" />
+  <img width="1600" height="733" alt="image" src="https://github.com/user-attachments/assets/3176fef2-32e9-4233-962c-48ad220f3e72" />
 </div>
 
 ---
