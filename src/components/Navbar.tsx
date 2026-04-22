@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface JWTUser { id: string; name: string; email: string; role: string; }
 
@@ -43,225 +42,89 @@ export default function Navbar() {
 
   const navLink = (href: string, label: string) => (
     <Link key={`${href}-${label}`} href={href} style={{
-      position: 'relative',
-      color: pathname === href ? 'var(--primary-h)' : 'var(--muted)',
-      fontWeight: 600, fontSize: 14, padding: '8px 12px', borderRadius: 8,
-      transition: 'all 0.3s',
-    }}>
-      {label}
-      {pathname === href && (
-        <motion.div 
-          layoutId="nav-underline"
-          style={{ position: 'absolute', bottom: 0, left: 12, right: 12, height: 2, background: 'var(--primary)', borderRadius: 2 }}
-        />
-      )}
-    </Link>
+      color: pathname === href ? '#818cf8' : '#94a3b8',
+      fontWeight: 500, fontSize: 14, padding: '6px 10px', borderRadius: 8,
+      transition: 'color 0.2s',
+    }}>{label}</Link>
   );
 
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   return (
-    <>
-      <nav className="navbar glass">
+    <nav className="navbar">
+      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
         {/* Logo */}
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <motion.div 
-            whileHover={{ rotate: 180 }}
-            transition={{ duration: 0.6, ease: "anticipate" }}
-            style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--gradient-brand)', display:'flex',alignItems:'center',justifyContent:'center', fontWeight:800, fontSize:16, color:'#fff', boxShadow: '0 0 15px var(--primary-glow)' }}
-          >
-            A
-          </motion.div>
-          <span style={{ fontWeight: 800, fontSize: 18, color: 'var(--text)', letterSpacing: '-0.5px' }}>
-            AdFlow <span className="gradient-text">Pro</span>
-          </span>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg,#6366f1,#38bdf8)', display:'flex',alignItems:'center',justifyContent:'center', fontWeight:800, fontSize:14, color:'#fff' }}>A</div>
+          <span style={{ fontWeight: 800, fontSize: 16, color: '#e2e8f0' }}>AdFlow <span style={{ color: '#818cf8' }}>Pro</span></span>
         </Link>
 
-        {/* Centre nav links (Desktop) */}
+        {/* Centre nav links */}
         <div className="nav-center" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {navLink('/explore', 'Explore')}
           {user && navLink(ROLE_HOME[user.role] ?? '/dashboard', 'Dashboard')}
           {isAdmin && navLink('/admin/analytics', 'Analytics')}
           {isAdmin && navLink('/admin/payments',  'Payments')}
+          {isAdmin && navLink('/admin/health',    'Health')}
           {isMod   && navLink('/moderator/ads',   'Review Queue')}
         </div>
 
         {/* Right side */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button 
-            className="mobile-only-flex" 
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            style={{ 
-              display: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', 
-              width: 42, height: 42, borderRadius: '12px', cursor: 'pointer',
-              flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5
-            }}
-          >
-            <div style={{ width: 20, height: 2, background: '#fff', borderRadius: 2 }} />
-            <div style={{ width: 20, height: 2, background: '#fff', borderRadius: 2 }} />
-            <div style={{ width: 20, height: 2, background: '#fff', borderRadius: 2 }} />
-          </button>
-
-          <div className="desktop-only-flex" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {user ? (
-              <>
-                {user.role === 'client' && (
-                  <Link href="/ads/new" className="btn btn-primary btn-sm pulse">+ Post Ad</Link>
-                )}
-                <div style={{ position: 'relative' }}>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setMenuOpen(!menuOpen)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: 12, padding: '6px 12px', cursor: 'pointer', color: 'var(--text)', fontSize: 13 }}
-                  >
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--gradient-brand)', display:'flex',alignItems:'center',justifyContent:'center', fontSize:12, fontWeight:700, color:'#fff' }}>
-                      {user.email?.[0]?.toUpperCase()}
-                    </div>
-                    <span className="hide-on-mobile" style={{ fontWeight: 600 }}>{user.email.split('@')[0]}</span>
-                    <span style={{ color: 'var(--dim)', fontSize: 10 }}>▼</span>
-                  </motion.button>
-                  
-                  <AnimatePresence>
-                    {menuOpen && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="glass"
-                        style={{ position: 'absolute', right: 0, top: 'calc(100% + 12px)', padding: 8, minWidth: 220, zIndex: 200, boxShadow: 'var(--shadow-lg)' }}
-                      >
-                        <div style={{ padding: '12px', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
-                          <p style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 2 }}>Access Level</p>
-                          <p style={{ color: 'var(--primary-h)', fontWeight: 700, fontSize: 14, textTransform: 'capitalize' }}>{user.role.replace('_', ' ')}</p>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <Link href="/dashboard/profile" onClick={() => setMenuOpen(false)} className="dropdown-item">Profile Settings</Link>
-                          <Link href="/dashboard/notifications" onClick={() => setMenuOpen(false)} className="dropdown-item">Notifications</Link>
-                          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-                          <button onClick={logout} className="dropdown-item" style={{ color: 'var(--danger)', fontWeight: 600 }}>Sign Out</button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <Link href="/login" style={{ color: 'var(--muted)', fontSize: 14, fontWeight: 600 }}>Sign In</Link>
-                <Link href="/register" className="btn btn-primary btn-sm">Get Started</Link>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <style jsx>{`
-          @media (max-width: 900px) {
-            .mobile-only-flex { display: flex !important; }
-            .desktop-only-flex { display: none !important; }
-            .hide-on-mobile { display: none !important; }
-          }
-          .dropdown-item {
-            display: block;
-            padding: 10px 12px;
-            border-radius: 8px;
-            color: var(--muted);
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.2s;
-          }
-          .dropdown-item:hover {
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text);
-            padding-left: 16px;
-          }
-        `}</style>
-      </nav>
-
-      {/* Mobile Menu Overlay */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ 
-              position: 'fixed', inset: 0, 
-              background: 'rgba(2, 2, 5, 0.98)', 
-              backdropFilter: 'blur(15px)',
-              zIndex: 100000, 
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              padding: '60px 24px'
-            }}
-          >
-            <button 
-              onClick={() => setIsMobileMenuOpen(false)} 
-              style={{ position: 'absolute', top: 30, right: 30, background: 'none', border: 'none', color: '#fff', fontSize: 32, cursor: 'pointer' }}
-            >
-              ✕
-            </button>
-
-            <motion.div
-              initial={{ y: 10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              style={{ 
-                display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center', width: '100%', maxWidth: '300px',
-                overflowY: 'auto', maxHeight: '80vh', padding: '20px 0'
-              }}
-            >
-              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} style={{ color: '#fff', fontSize: 18, fontWeight: 700, textDecoration: 'none', padding: '10px' }}>Home</Link>
-              <Link href="/explore" onClick={() => setIsMobileMenuOpen(false)} style={{ color: '#fff', fontSize: 18, fontWeight: 700, textDecoration: 'none', padding: '10px' }}>Marketplace</Link>
-              
-              {user && (
-                <>
-                  <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '5px 0' }} />
-                  <Link href={ROLE_HOME[user.role] ?? '/dashboard'} onClick={() => setIsMobileMenuOpen(false)} style={{ color: '#fff', fontSize: 18, fontWeight: 700, textDecoration: 'none', padding: '10px' }}>Dashboard</Link>
-                  
-                  {isAdmin && (
-                    <>
-                      <Link href="/admin/analytics" onClick={() => setIsMobileMenuOpen(false)} style={{ color: 'var(--primary-h)', fontSize: 18, fontWeight: 700, textDecoration: 'none', padding: '10px' }}>Analytics</Link>
-                      <Link href="/admin/payments" onClick={() => setIsMobileMenuOpen(false)} style={{ color: 'var(--primary-h)', fontSize: 18, fontWeight: 700, textDecoration: 'none', padding: '10px' }}>Payments</Link>
-                    </>
-                  )}
-                  
-                  {isMod && (
-                    <Link href="/moderator/ads" onClick={() => setIsMobileMenuOpen(false)} style={{ color: 'var(--accent)', fontSize: 18, fontWeight: 700, textDecoration: 'none', padding: '10px' }}>Review Queue</Link>
-                  )}
-                  
-                  <Link href="/dashboard/profile" onClick={() => setIsMobileMenuOpen(false)} style={{ color: 'rgba(255,255,255,0.6)', fontSize: 16, fontWeight: 600, textDecoration: 'none', padding: '10px' }}>Account Settings</Link>
-                </>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {user ? (
+            <>
+              {/* Only clients can post new ads */}
+              {user.role === 'client' && (
+                <Link href="/ads/new" className="btn btn-primary btn-sm">+ Post Ad</Link>
               )}
-
-              <div style={{ marginTop: 10, padding: 24, borderRadius: 24, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
-                {!user ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <p style={{ color: 'var(--muted)', fontSize: 12, fontWeight: 500 }}>READY TO ACCESS?</p>
-                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="btn btn-primary" style={{ width: '100%', height: 48, borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      Sign In
-                    </Link>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '6px 12px', cursor: 'pointer', color: '#e2e8f0', fontSize: 13 }}
+                >
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#a78bfa)', display:'flex',alignItems:'center',justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff' }}>
+                    {user.email?.[0]?.toUpperCase()}
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', marginBottom: 4 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gradient-brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 14, fontWeight: 700, color: '#fff' }}>
-                        {user.email[0].toUpperCase()}
-                      </div>
-                      <div style={{ textAlign: 'left' }}>
-                        <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{user.email.split('@')[0]}</p>
-                        <p style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'capitalize' }}>{user.role.replace('_', ' ')}</p>
-                      </div>
+                  <span style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email.split('@')[0]}</span>
+                  <span style={{ color: '#64748b' }}>▾</span>
+                </button>
+                {menuOpen && (
+                  <div style={{ position: 'absolute', right: 0, top: '110%', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 8, minWidth: 180, zIndex: 200, boxShadow: '0 8px 30px rgba(0,0,0,0.4)' }}>
+                    <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
+                      <p style={{ color: '#64748b', fontSize: 11 }}>Signed in as</p>
+                      <p style={{ color: '#818cf8', fontWeight: 600, fontSize: 13, textTransform: 'capitalize' }}>{user.role.replace('_', ' ')}</p>
                     </div>
-                    <button onClick={logout} style={{ width: '100%', height: 48, background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', fontSize: 14, fontWeight: 700, borderRadius: 100, cursor: 'pointer' }}>
-                      Sign Out
-                    </button>
+
+                    {/* Dynamic Links Based on Role */}
+                    {user.role === 'client' && (
+                      <Link href="/dashboard" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '8px 12px', borderRadius: 8, color: '#94a3b8', fontSize: 13, transition: 'background 0.1s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>My Ads</Link>
+                    )}
+                    {isAdmin && (
+                      <>
+                        <Link href="/admin/analytics" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '8px 12px', borderRadius: 8, color: '#94a3b8', fontSize: 13 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Analytics</Link>
+                        <Link href="/admin/payments" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '8px 12px', borderRadius: 8, color: '#fb923c', fontSize: 13 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251,146,60,0.08)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>💰 Payments</Link>
+                        <Link href="/admin/health" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '8px 12px', borderRadius: 8, color: '#94a3b8', fontSize: 13 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>System Health</Link>
+                      </>
+                    )}
+                    {isMod && (
+                      <Link href="/moderator/ads" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '8px 12px', borderRadius: 8, color: '#94a3b8', fontSize: 13 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Review Queue</Link>
+                    )}
+
+                    {/* All logged-in users have profile and notifications */}
+                    <Link href="/dashboard/profile" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '8px 12px', borderRadius: 8, color: '#94a3b8', fontSize: 13 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Profile Settings</Link>
+                    <Link href="/dashboard/notifications" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '8px 12px', borderRadius: 8, color: '#94a3b8', fontSize: 13, borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4, paddingBottom: 12 }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Notifications</Link>
+
+                    <button onClick={logout} style={{ display: 'block', width: '100%', padding: '8px 12px', borderRadius: 8, color: '#f87171', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>Sign Out</button>
                   </div>
                 )}
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+            </>
+          ) : (
+            <>
+              {navLink('/login', 'Sign In')}
+              <Link href="/register" className="btn btn-primary btn-sm">Get Started</Link>
+            </>
+          )}
+        </div>
+      </div>
+    </nav>
   );
 }

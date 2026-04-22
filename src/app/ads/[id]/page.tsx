@@ -59,6 +59,17 @@ export default function AdDetailPage() {
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
+  const [user,      setUser]      = useState<{ id: string } | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('adflow_token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUser(payload);
+      } catch { setUser(null); }
+    }
+  }, []);
 
   useEffect(() => {
     if (!slug) return;
@@ -270,6 +281,17 @@ export default function AdDetailPage() {
             {ad.seller_phone && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
                 {(() => {
+                  if (!user) {
+                    return (
+                      <button
+                        onClick={() => router.push('/login')}
+                        className="btn"
+                        style={{ width: '100%', justifyContent: 'center', background: '#25D366', color: '#fff', border: 'none', fontWeight: 600 }}
+                      >
+                        💬 Chat on WhatsApp
+                      </button>
+                    );
+                  }
                   const waPhone = ad.seller_phone.replace(/[^0-9+]/g, '');
                   const priceText = ad.price ? `PKR ${ad.price.toLocaleString()}` : "Price on request";
                   const waMessage = encodeURIComponent(`Hi ${ad.seller_display_name || ad.owner_name}, I'm interested in your ad for "${ad.title}" priced at ${priceText} that I saw on AdFlow Pro.`);
@@ -286,13 +308,25 @@ export default function AdDetailPage() {
                   );
                 })()}
 
-                <a
-                  href={`tel:${ad.seller_phone}`}
-                  className="btn btn-ghost"
-                  style={{ width: '100%', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.1)' }}
-                >
-                  📞 Call {ad.seller_phone}
-                </a>
+                {user ? (
+                  <a
+                    href={`tel:${ad.seller_phone}`}
+                    className="btn btn-ghost"
+                    style={{ width: '100%', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.1)' }}
+                  >
+                    📞 Call {ad.seller_phone}
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => router.push('/login')}
+                    className="btn btn-ghost"
+                    style={{ width: '100%', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}
+                  >
+                    📞 Call <span style={{ filter: 'blur(5px)', marginLeft: 4, userSelect: 'none', opacity: 0.8 }}>
+                      {ad.seller_phone.slice(0, 4)}XXXXXXX
+                    </span>
+                  </button>
+                )}
               </div>
             )}
 

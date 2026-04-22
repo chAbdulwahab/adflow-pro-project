@@ -99,26 +99,34 @@ export default function AnalyticsPage() {
       .finally(() => setLoading(false));
   }, [token, days]);
 
+  // ── Styles ──────────────────────────────────────────────────────────────────
+  const page: React.CSSProperties = {
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
+    padding: '40px 32px',
+    fontFamily: "'Inter', sans-serif",
+    color: '#e2e8f0',
+  };
+
   if (!token) return (
-    <div className="container" style={{ padding: '100px 24px' }}>
-      <p style={{ color: 'var(--muted)', marginBottom: 12 }}>Paste your admin JWT token to view analytics:</p>
+    <div style={page}>
+      <p style={{ color: '#94a3b8' }}>Paste your admin JWT token to view analytics:</p>
       <input
-        className="input"
-        style={{ width: '100%', maxWidth: 600 }}
+        style={{ marginTop: 12, width: '100%', maxWidth: 600, padding: '10px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#fff', fontSize: 14 }}
         placeholder="Bearer eyJ..."
         onChange={e => { localStorage.setItem('adflow_token', e.target.value); setToken(e.target.value); }}
       />
     </div>
   );
 
-  if (loading) return <div className="container" style={{ padding: '100px 24px', textAlign: 'center' }}><p style={{ color: 'var(--muted)' }}>Synchronizing analytics data...</p></div>;
-  if (error)   return <div className="container" style={{ padding: '100px 24px', textAlign: 'center' }}><p style={{ color: 'var(--danger)' }}>Error: {error}</p></div>;
+  if (loading) return <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: '#94a3b8', fontSize: 18 }}>Loading analytics…</p></div>;
+  if (error)   return <div style={{ ...page }}><p style={{ color: '#f87171' }}>Error: {error}</p></div>;
   if (!data)   return null;
 
   const { kpis, charts } = data;
 
   return (
-    <div style={{ padding: '40px 0' }} className="admin-page-container container">
+    <div style={page} className="admin-page-container">
       {/* Header */}
       <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
         <div>

@@ -75,188 +75,113 @@ export default function PostAdPage() {
   const selectedPkg = packages.find(p => p.id === form.package_id);
 
   return (
-    <div 
-      suppressHydrationWarning
-      style={{ 
-        minHeight: '100vh', padding: '100px 24px', 
-        background: '#020205',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-    >
-      {/* Dynamic Background Glows */}
-      <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '40%', height: '40%', background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)', filter: 'blur(100px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: '10%', right: '-5%', width: '35%', height: '35%', background: 'radial-gradient(circle, rgba(168,85,247,0.1) 0%, transparent 70%)', filter: 'blur(100px)', pointerEvents: 'none' }} />
+    <div className="container" style={{ padding: '48px 24px', maxWidth: 720 }}>
+      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>Post a New <span className="gradient-text">Ad</span></h1>
+      <p style={{ color: '#64748b', marginBottom: 36 }}>Fill in the details below. Your ad will be reviewed before going live.</p>
 
-      <div className="container" style={{ maxWidth: 850, position: 'relative', zIndex: 1 }}>
-        <div style={{ marginBottom: 50, textAlign: 'center' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '6px 16px', borderRadius: 100, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', boxShadow: '0 0 10px var(--primary)' }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.1em' }}>SECURE DEPLOYMENT PROTOCOL</span>
-          </div>
-          <h1 style={{ fontSize: 42, fontWeight: 800, marginBottom: 12, letterSpacing: '-0.04em' }}>Marketplace <span className="gradient-text">Submission</span></h1>
-          <p style={{ color: 'var(--muted)', fontSize: 16, fontWeight: 500, maxWidth: 500, margin: '0 auto' }}>Connect your asset to the largest sponsored network in Pakistan.</p>
+      {error && <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:10, padding:'10px 14px', color:'#f87171', marginBottom:20 }}>{error}</div>}
+
+      <form onSubmit={submit}>
+        {/* Title */}
+        <div className="form-group">
+          <label htmlFor="title">Ad Title *</label>
+          <input id="title" className="input" placeholder="e.g. Selling iPhone 15 Pro Max — Karachi" required value={form.title} onChange={e => setForm({...form, title: e.target.value})} />
+          {errors.title && <p className="form-error">{errors.title[0]}</p>}
         </div>
 
-        {error && (
-          <div style={{ 
-            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', 
-            borderRadius: 16, padding: '18px', color: '#ef4444', 
-            fontSize: 14, marginBottom: 40, textAlign: 'center', fontWeight: 600 
-          }}>
-            ⚠️ {error}
+        {/* Description */}
+        <div className="form-group">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <label htmlFor="desc" style={{ marginBottom: 0 }}>Description *</label>
+            <button 
+              type="button" 
+              onClick={generateAI} 
+              disabled={generating}
+              style={{ background: 'linear-gradient(135deg, #a855f7, #6366f1)', border: 'none', padding: '4px 10px', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: generating ? 0.7 : 1 }}
+            >
+              {generating ? '⏳ Generating...' : '✨ Write with AI'}
+            </button>
+          </div>
+          <textarea id="desc" className="textarea" placeholder="Describe your item in detail — condition, specs, what's included…" required value={form.description} onChange={e => setForm({...form, description: e.target.value})} style={{ minHeight: 140 }} />
+          {errors.description && <p className="form-error">{errors.description[0]}</p>}
+        </div>
+
+        {/* Price */}
+        <div className="form-group">
+          <label htmlFor="price">Price (PKR) — leave blank for "Contact seller"</label>
+          <input id="price" type="number" className="input" placeholder="e.g. 250000" value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
+        </div>
+
+        {/* Category + City */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="form-group">
+            <label htmlFor="category">Category *</label>
+            <select id="category" className="select" required value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})}>
+              <option value="">Select category…</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            {errors.category_id && <p className="form-error">{errors.category_id[0]}</p>}
+          </div>
+          <div className="form-group">
+            <label htmlFor="city">City *</label>
+            <input 
+              id="city" 
+              className="input" 
+              list="city-options" 
+              placeholder="e.g. Lahore, Karachi, or type your own…" 
+              required 
+              value={form.city_name} 
+              onChange={e => setForm({...form, city_name: e.target.value})} 
+            />
+            <datalist id="city-options">
+              {cities.map(c => <option key={c.id} value={c.name} />)}
+            </datalist>
+            {errors.city_name && <p className="form-error">{errors.city_name[0]}</p>}
+          </div>
+        </div>
+
+        {/* Package */}
+        <div className="form-group">
+          <label>Listing Package *</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
+            {packages.map(pkg => (
+              <div key={pkg.id} onClick={() => setForm({...form, package_id: pkg.id})}
+                style={{ padding: '16px 18px', borderRadius: 12, border: `2px solid ${form.package_id === pkg.id ? '#6366f1' : 'rgba(255,255,255,0.08)'}`, background: form.package_id === pkg.id ? 'rgba(99,102,241,0.1)' : 'var(--surface)', cursor: 'pointer', transition: 'all 0.2s' }}>
+                <p style={{ fontWeight: 700, marginBottom: 4, color: form.package_id === pkg.id ? '#818cf8' : '#e2e8f0' }}>{pkg.name}</p>
+                <p style={{ color: '#64748b', fontSize: 13 }}>{pkg.duration_days} days</p>
+                <p style={{ color: form.package_id === pkg.id ? '#818cf8' : '#94a3b8', fontWeight: 700, marginTop: 8 }}>PKR {pkg.price?.toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+          {errors.package_id && <p className="form-error">{errors.package_id[0]}</p>}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="media">Media URLs * (one per line)</label>
+          <textarea id="media" className="textarea" placeholder={`YouTube:\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ\n\nCloudinary:\nhttps://res.cloudinary.com/demo/image/upload/sample.jpg\n\nDirect image:\nhttps://example.com/photos/car.jpg`} required value={form.media_urls} onChange={e => setForm({...form, media_urls: e.target.value})} style={{ minHeight: 130, fontFamily: 'monospace', fontSize: 13 }} />
+          {errors.media_urls && <p className="form-error">{errors.media_urls[0]}</p>}
+          <div style={{ marginTop: 8, padding: '10px 14px', background: 'rgba(56,189,248,0.06)', borderRadius: 8, border: '1px solid rgba(56,189,248,0.15)' }}>
+            <p style={{ color: '#38bdf8', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>✅ Accepted formats:</p>
+            <p style={{ color: '#64748b', fontSize: 12 }}>• YouTube links — <code style={{ color: '#94a3b8' }}>https://youtube.com/watch?v=...</code></p>
+            <p style={{ color: '#64748b', fontSize: 12 }}>• Cloudinary URLs — <code style={{ color: '#94a3b8' }}>https://res.cloudinary.com/...</code></p>
+            <p style={{ color: '#64748b', fontSize: 12 }}>• Direct image URLs — ending in <code style={{ color: '#94a3b8' }}>.jpg .png .webp</code></p>
+            <p style={{ color: '#f87171', fontSize: 12, marginTop: 6 }}>❌ Not accepted: base64 images (data:image/...), file paths, Google Drive/Dropbox links</p>
+          </div>
+        </div>
+
+        {/* Summary + Submit */}
+        {selectedPkg && (
+          <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '14px 18px', marginBottom: 20 }}>
+            <p style={{ color: '#818cf8', fontWeight: 600, marginBottom: 4 }}>📦 {selectedPkg.name} Package Selected</p>
+            <p style={{ color: '#94a3b8', fontSize: 13 }}>Your ad will be reviewed, then payment of <strong style={{ color: '#e2e8f0' }}>PKR {selectedPkg.price?.toLocaleString()}</strong> will be required before going live for {selectedPkg.duration_days} days.</p>
           </div>
         )}
 
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
-          
-          {/* Section 1: Specifications */}
-          <div className="glass-card" style={{ padding: 40, borderRadius: 32, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 12, background: 'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 14, fontWeight: 800, color: '#fff', boxShadow: '0 0 20px var(--primary-glow)' }}>01</div>
-              <h3 style={{ fontSize: 20, fontWeight: 800 }}>Asset Specifications</h3>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-              <div className="form-group">
-                <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--dim)', marginBottom: 10, display: 'block', letterSpacing: '0.05em' }}>ADVERTISEMENT TITLE</label>
-                <input 
-                  id="title" className="input" placeholder="What are you listing today?" required 
-                  value={form.title} onChange={e => setForm({...form, title: e.target.value})} 
-                  style={{ width: '100%', height: 54, borderRadius: 14, background: 'rgba(255,255,255,0.02)', fontSize: 16 }}
-                />
-              </div>
-
-              <div className="form-group">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--dim)', display: 'block', letterSpacing: '0.05em' }}>TECHNICAL DESCRIPTION</label>
-                  <button 
-                    type="button" onClick={generateAI} disabled={generating}
-                    style={{ 
-                      background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.2)',
-                      padding: '6px 14px', borderRadius: 100, fontSize: 11, fontWeight: 800, cursor: 'pointer',
-                      transition: 'all 0.3s'
-                    }}
-                    onMouseOver={e => e.currentTarget.style.background = 'rgba(168, 85, 247, 0.2)'}
-                    onMouseOut={e => e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)'}
-                  >
-                    {generating ? 'ANALYZING...' : '✨ ENHANCE WITH AI'}
-                  </button>
-                </div>
-                <textarea 
-                  id="desc" className="textarea" placeholder="Detail condition, features, and specifications..." required 
-                  value={form.description} onChange={e => setForm({...form, description: e.target.value})} 
-                  style={{ minHeight: 180, borderRadius: 14, background: 'rgba(255,255,255,0.02)', fontSize: 15, lineHeight: 1.6 }} 
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Logistics */}
-          <div className="glass-card" style={{ padding: 40, borderRadius: 32, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 12, background: 'var(--secondary)', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 14, fontWeight: 800, color: '#fff', boxShadow: '0 0 20px var(--secondary-glow)' }}>02</div>
-              <h3 style={{ fontSize: 20, fontWeight: 800 }}>Logistics & Valuation</h3>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-              <div className="form-group">
-                <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--dim)', marginBottom: 10, display: 'block' }}>TARGET PRICE (PKR)</label>
-                <input 
-                  type="number" className="input" placeholder="e.g. 500,000" 
-                  value={form.price} onChange={e => setForm({...form, price: e.target.value})} 
-                  style={{ width: '100%', height: 54, borderRadius: 14, background: 'rgba(255,255,255,0.02)' }}
-                />
-              </div>
-              <div className="form-group">
-                <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--dim)', marginBottom: 10, display: 'block' }}>SECTOR CATEGORY</label>
-                <select 
-                  className="input" required value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})}
-                  style={{ width: '100%', height: 54, borderRadius: 14, background: 'rgba(255,255,255,0.02)', appearance: 'none' }}
-                >
-                  <option value="">Select Category...</option>
-                  {categories.map(c => <option key={c.id} value={c.id} style={{ background: '#0a0a16' }}>{c.name}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginTop: 24 }}>
-              <label style={{ fontSize: 12, fontWeight: 800, color: 'var(--dim)', marginBottom: 10, display: 'block' }}>NETWORK HUB (CITY)</label>
-              <input 
-                className="input" list="city-options" placeholder="Select deployment city..." required 
-                value={form.city_name} onChange={e => setForm({...form, city_name: e.target.value})} 
-                style={{ width: '100%', height: 54, borderRadius: 14, background: 'rgba(255,255,255,0.02)' }}
-              />
-              <datalist id="city-options">
-                {cities.map(c => <option key={c.id} value={c.name} />)}
-              </datalist>
-            </div>
-          </div>
-
-          {/* Section 3: Visibility */}
-          <div className="glass-card" style={{ padding: 40, borderRadius: 32, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 12, background: 'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 14, fontWeight: 800, color: '#fff', boxShadow: '0 0 20px var(--accent-glow)' }}>03</div>
-              <h3 style={{ fontSize: 20, fontWeight: 800 }}>Visibility Protocol</h3>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 20 }}>
-              {packages.map(pkg => {
-                const isActive = form.package_id === pkg.id;
-                return (
-                  <div 
-                    key={pkg.id} onClick={() => setForm({...form, package_id: pkg.id})}
-                    style={{ 
-                      padding: '28px', borderRadius: 24, cursor: 'pointer', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                      background: isActive ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.01)',
-                      border: `1px solid ${isActive ? 'var(--primary)' : 'rgba(255,255,255,0.05)'}`,
-                      boxShadow: isActive ? '0 15px 35px rgba(99,102,241,0.15)' : 'none',
-                      transform: isActive ? 'scale(1.02)' : 'none'
-                    }}
-                  >
-                    <p style={{ fontWeight: 800, fontSize: 18, marginBottom: 6, color: isActive ? '#fff' : 'var(--muted)' }}>{pkg.name}</p>
-                    <p style={{ fontSize: 12, color: isActive ? 'var(--primary-h)' : 'var(--dim)', fontWeight: 700, letterSpacing: '0.05em' }}>{pkg.duration_days} DAYS PROTOCOL</p>
-                    <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '20px 0' }} />
-                    <p style={{ fontSize: 22, fontWeight: 800, color: isActive ? 'var(--primary-h)' : '#fff' }}>PKR {pkg.price?.toLocaleString()}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Section 4: Assets */}
-          <div className="glass-card" style={{ padding: 40, borderRadius: 32, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 12, background: '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 14, fontWeight: 800, color: '#000' }}>04</div>
-              <h3 style={{ fontSize: 20, fontWeight: 800 }}>Media Repository</h3>
-            </div>
-            <textarea 
-              className="textarea" placeholder="YouTube, Cloudinary, or Direct Image URLs (one per line)..." required 
-              value={form.media_urls} onChange={e => setForm({...form, media_urls: e.target.value})} 
-              style={{ minHeight: 140, borderRadius: 14, background: 'rgba(255,255,255,0.02)', fontFamily: 'monospace', fontSize: 14 }} 
-            />
-          </div>
-
-          {/* Final Action */}
-          <div style={{ textAlign: 'center', padding: '20px 0 60px' }}>
-            <button 
-              type="submit" disabled={loading} 
-              className="btn btn-primary" 
-              style={{ 
-                width: '100%', maxWidth: '420px', height: 64, borderRadius: 100,
-                fontSize: 18, fontWeight: 800, letterSpacing: '0.03em',
-                boxShadow: '0 20px 40px var(--primary-glow)',
-                animation: loading ? 'pulse 2s infinite' : 'none'
-              }}
-            >
-              {loading ? 'TRANSMITTING...' : 'INITIALIZE SUBMISSION →'}
-            </button>
-            <p style={{ color: 'var(--dim)', fontSize: 14, marginTop: 20, fontWeight: 500 }}>
-              Ad will be saved as draft and synchronized with the moderation network.
-            </p>
-          </div>
-        </form>
-      </div>
+        <button type="submit" disabled={loading} className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center', opacity: loading ? 0.7 : 1 }}>
+          {loading ? 'Saving Ad…' : 'Save as Draft →'}
+        </button>
+        <p style={{ color: '#475569', fontSize: 13, textAlign: 'center', marginTop: 10 }}>Saved as draft. You can review and submit for moderation from your dashboard.</p>
+      </form>
     </div>
   );
 }
