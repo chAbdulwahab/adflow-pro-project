@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import Navbar from '@/components/Navbar';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+import FramerWrapper from '@/components/FramerWrapper';
 
 export const metadata: Metadata = {
   title: { default: 'AdFlow Pro — Pakistan\'s Sponsored Ad Marketplace', template: '%s | AdFlow Pro' },
@@ -12,11 +10,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <div className="hero-glow" />
         <Navbar />
-        <main>{children}</main>
+        <FramerWrapper>
+          <main style={{ paddingTop: '100px' }}>
+            {children}
+          </main>
+        </FramerWrapper>
       </body>
     </html>
   );
 }
+

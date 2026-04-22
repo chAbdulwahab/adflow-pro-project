@@ -37,40 +37,123 @@ export default function RegisterPage() {
   );
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: "40px 24px", background: 'radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.12) 0%, transparent 60%)' }}>
-      <div className="card" style={{ width: '100%', maxWidth: 480 }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#6366f1,#38bdf8)', display:'flex',alignItems:'center',justifyContent:'center', fontSize:22, fontWeight:800, color:'#fff', margin:'0 auto 16px' }}>A</div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6 }}>Create your account</h1>
-          <p style={{ color: '#64748b', fontSize: 14 }}>Join thousands of sellers today.</p>
+    <div 
+      suppressHydrationWarning
+      style={{ 
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: "60px 24px", 
+        background: 'radial-gradient(circle at center, rgba(14,165,233,0.1) 0%, #020205 70%)' 
+      }}
+    >
+      <div 
+        className="glass-card" 
+        style={{ 
+          width: '100%', maxWidth: 540, padding: 40, borderRadius: 32, 
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)' 
+        }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div style={{ 
+            width: 56, height: 56, borderRadius: 16, 
+            background: 'linear-gradient(135deg, var(--secondary), var(--primary))', 
+            display:'flex', alignItems:'center', justifyContent:'center', 
+            fontSize:24, fontWeight:800, color:'#fff', margin:'0 auto 20px',
+            boxShadow: '0 0 20px var(--secondary-glow)'
+          }}>
+            A
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, letterSpacing: '-0.03em', color: '#fff' }}>Initialize Profile</h1>
+          <p style={{ color: 'var(--muted)', fontSize: 14, fontWeight: 500 }}>Join the elite AdFlow Pro marketplace network</p>
         </div>
 
-        {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, padding: '10px 14px', color: '#f87171', fontSize: 14, marginBottom: 16 }}>{error}</div>}
+        {error && (
+          <div style={{ 
+            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', 
+            borderRadius: 12, padding: '12px 16px', color: '#ef4444', 
+            fontSize: 14, marginBottom: 24, textAlign: 'center', fontWeight: 600 
+          }}>
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={submit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {field('name',     'Full Name',    'text',     'John Doe')}
-            {field('email',    'Email',        'email',    'you@example.com')}
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="form-group">
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6, display: 'block' }}>FULL NAME</label>
+              <input 
+                type="text" className="input" placeholder="John Doe" required 
+                value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} 
+                style={{ width: '100%', height: 48, borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}
+              />
+              {errors.name && <p style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.name[0]}</p>}
+            </div>
+            <div className="form-group">
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6, display: 'block' }}>EMAIL ADDRESS</label>
+              <input 
+                type="email" className="input" placeholder="you@example.com" required 
+                value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} 
+                style={{ width: '100%', height: 48, borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}
+              />
+              {errors.email && <p style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.email[0]}</p>}
+            </div>
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {field('phone',    'Phone Number', 'tel',      '03001234567')}
-            {field('city',     'City',         'text',     'Lahore')}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="form-group">
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6, display: 'block' }}>PHONE NUMBER</label>
+              <input 
+                type="tel" className="input" placeholder="03001234567" required 
+                value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} 
+                style={{ width: '100%', height: 48, borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}
+              />
+            </div>
+            <div className="form-group">
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6, display: 'block' }}>LOCATION (CITY)</label>
+              <input 
+                type="text" className="input" placeholder="Lahore" required 
+                value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} 
+                style={{ width: '100%', height: 48, borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}
+              />
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-            {field('business_name', 'Business Name', 'text', 'My Awesome Store', false)}
-            {field('password', 'Password',     'password', '6+ characters')}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+            <div className="form-group">
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6, display: 'block' }}>BUSINESS NAME (OPTIONAL)</label>
+              <input 
+                type="text" className="input" placeholder="Nexus Solutions" 
+                value={form.business_name} onChange={e => setForm({ ...form, business_name: e.target.value })} 
+                style={{ width: '100%', height: 48, borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}
+              />
+            </div>
+            <div className="form-group">
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6, display: 'block' }}>SECURE ACCESS KEY</label>
+              <input 
+                type="password" className="input" placeholder="••••••••" required 
+                value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} 
+                style={{ width: '100%', height: 48, borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}
+              />
+              {errors.password && <p style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.password[0]}</p>}
+            </div>
           </div>
 
-          <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12, opacity: loading ? 0.7 : 1 }}>
-            {loading ? 'Creating account…' : 'Create Account'}
+          <button 
+            type="submit" disabled={loading} 
+            className="btn btn-primary" 
+            style={{ 
+              width: '100%', height: 56, borderRadius: 100, marginTop: 10,
+              fontSize: 16, fontWeight: 800, letterSpacing: '0.02em',
+              opacity: loading ? 0.7 : 1, transition: 'all 0.3s'
+            }}
+          >
+            {loading ? 'Transmitting Data...' : 'Create Network Profile'}
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', color: '#64748b', fontSize: 14, marginTop: 24 }}>
-          Already have an account? <Link href="/login" style={{ color: '#818cf8', fontWeight: 600 }}>Sign in</Link>
-        </p>
+        <div style={{ textAlign: 'center', marginTop: 32 }}>
+          <p style={{ color: 'var(--muted)', fontSize: 14, fontWeight: 500 }}>
+            Existing member? <Link href="/login" style={{ color: 'var(--primary-h)', fontWeight: 700, textDecoration: 'none' }}>Access Portal</Link>
+          </p>
+        </div>
       </div>
     </div>
   );
