@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 interface Conversation {
@@ -22,7 +20,7 @@ interface Message {
   created_at: string;
 }
 
-export default function ChatPage() {
+function ChatContent() {
   const searchParams = useSearchParams();
   const router       = useRouter();
   const activeId     = searchParams.get('id');
@@ -335,5 +333,17 @@ export default function ChatPage() {
       {Sidebar}
       {ChatPanel}
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" />
+      </div>
+    }>
+      <ChatContent />
+    </Suspense>
   );
 }
