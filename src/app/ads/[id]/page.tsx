@@ -13,6 +13,7 @@ interface Media {
 
 interface Ad {
   id: string;
+  user_id: string;
   title: string;
   slug: string;
   description: string;
@@ -57,9 +58,10 @@ export default function AdDetailPage() {
   const [ad,        setAd]        = useState<Ad | null>(null);
   const [related,   setRelated]   = useState<RelatedAd[]>([]);
   const [loading,   setLoading]   = useState(true);
+  const [deleting,  setDeleting]  = useState(false);
   const [error,     setError]     = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
-  const [user,      setUser]      = useState<{ id: string } | null>(null);
+  const [user,      setUser]      = useState<{ id: string, role: string } | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('adflow_token');
@@ -79,6 +81,12 @@ export default function AdDetailPage() {
         if (r.success) {
           setAd(r.ad);
           setRelated(r.related_ads ?? []);
+          // Fire view tracking (fire-and-forget — errors are intentionally swallowed)
+          const token = localStorage.getItem('adflow_token');
+          fetch(`/api/ads/${r.ad.id}/view`, {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }).catch(() => {});
         } else {
           setError(r.error ?? 'Ad not found');
         }
@@ -86,6 +94,32 @@ export default function AdDetailPage() {
       .catch(() => setError('Failed to load ad'))
       .finally(() => setLoading(false));
   }, [slug]);
+
+  const handleDelete = async () => {
+    if (!ad || !confirm('Are you sure you want to delete this ad? This action cannot be undone.')) return;
+    
+    setDeleting(true);
+    try {
+      const token = localStorage.getItem('adflow_token');
+      const res = await fetch(`/api/ads/${ad.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Ad deleted successfully');
+        router.push('/explore');
+      } else {
+        alert(data.error || 'Failed to delete ad');
+      }
+    } catch (err) {
+      alert('Network error while deleting ad');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (loading) return (
     <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -113,6 +147,8 @@ export default function AdDetailPage() {
   const daysLeft    = ad.expire_at
     ? Math.max(0, Math.ceil((new Date(ad.expire_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null;
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
@@ -296,15 +332,48 @@ export default function AdDetailPage() {
                   const priceText = ad.price ? `PKR ${ad.price.toLocaleString()}` : "Price on request";
                   const waMessage = encodeURIComponent(`Hi ${ad.seller_display_name || ad.owner_name}, I'm interested in your ad for "${ad.title}" priced at ${priceText} that I saw on AdFlow Pro.`);
                   return (
-                    <a
-                      href={`https://wa.me/${waPhone}?text=${waMessage}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn"
-                      style={{ width: '100%', justifyContent: 'center', background: '#25D366', color: '#fff', border: 'none', fontWeight: 600 }}
-                    >
-                      💬 Chat on WhatsApp
-                    </a>
+                    <>
+                      <a
+                        href={`https://wa.me/${waPhone}?text=${waMessage}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn"
+                        style={{ width: '100%', justifyContent: 'center', background: '#25D366', color: '#fff', border: 'none', fontWeight: 600 }}
+                      >
+                        💬 Chat on WhatsApp
+                      </a>
+                      <button
+                        onClick={async () => {
+                          if (!user) {
+                            router.push(`/login?callback=/ads/${ad.slug}`);
+                            return;
+                          }
+                          try {
+                            const token = localStorage.getItem('adflow_token');
+                            const res = await fetch('/api/chat/conversations', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                              },
+                              body: JSON.stringify({ ad_id: ad.id, seller_id: ad.user_id })
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                              router.push(`/dashboard/chat?id=${data.conversation.id}`);
+                            } else {
+                              alert(data.error || 'Failed to start chat');
+                            }
+                          } catch (err) {
+                            alert('Network error while starting chat');
+                          }
+                        }}
+                        className="btn btn-primary"
+                        style={{ width: '100%', justifyContent: 'center', fontWeight: 600 }}
+                      >
+                        ✉️ Chat with Seller
+                      </button>
+                    </>
                   );
                 })()}
 
@@ -342,6 +411,24 @@ export default function AdDetailPage() {
               </p>
             )}
           </div>
+          
+          {/* Admin Tools */}
+          {isAdmin && (
+            <div className="card" style={{ border: '1px solid #f87171', background: 'rgba(239,68,68,0.05)' }}>
+              <p style={{ fontWeight: 600, fontSize: 13, color: '#f87171', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Admin Tools</p>
+              <button 
+                onClick={handleDelete}
+                disabled={deleting}
+                className="btn"
+                style={{ width: '100%', justifyContent: 'center', background: '#ef4444', color: '#fff', border: 'none', fontWeight: 600 }}
+              >
+                {deleting ? 'Deleting...' : '🗑️ Delete This Ad'}
+              </button>
+              <p style={{ color: '#94a3b8', fontSize: 11, marginTop: 8, textAlign: 'center' }}>
+                Note: Deleting an ad is permanent and will remove all associated media and records.
+              </p>
+            </div>
+          )}
 
           {/* Safety tips */}
           <div className="card" style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)' }}>

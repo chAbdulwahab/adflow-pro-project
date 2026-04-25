@@ -23,7 +23,15 @@ export default function LoginPage() {
       const data = await res.json();
       if (!data.success) { setError(data.error ?? 'Login failed'); return; }
       localStorage.setItem('adflow_token', data.token);
-      router.push(ROLE_HOME[data.user.role] ?? '/dashboard');
+
+      // Check for callback redirect
+      const urlParams = new URLSearchParams(window.location.search);
+      const callback = urlParams.get('callback');
+      if (callback) {
+        router.push(callback);
+      } else {
+        router.push(ROLE_HOME[data.user.role] ?? '/dashboard');
+      }
     } catch { setError('Network error. Please try again.'); }
     finally   { setLoading(false); }
   };

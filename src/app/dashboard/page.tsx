@@ -48,7 +48,10 @@ export default function DashboardPage() {
           <h1 style={{ fontSize: 28, fontWeight: 800 }}>My <span className="gradient-text">Ads</span></h1>
           <p style={{ color: '#64748b', marginTop: 4 }}>{ads.length} listing{ads.length !== 1 ? 's' : ''} total</p>
         </div>
-        <Link href="/ads/new" className="btn btn-primary">+ Post New Ad</Link>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Link href="/dashboard/analytics" className="btn btn-ghost" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>📊 Analytics</Link>
+          <Link href="/ads/new" className="btn btn-primary">+ Post New Ad</Link>
+        </div>
       </div>
 
       {/* Summary stat cards */}

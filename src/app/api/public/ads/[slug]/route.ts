@@ -17,7 +17,7 @@ export async function GET(
     const { data: adData, error: adError } = await supabaseAdmin
       .from('ads')
       .select(`
-        id, title, slug, description, price,
+        id, user_id, title, slug, description, price,
         is_featured, rank_score, publish_at, expire_at, created_at,
         category_id,
         categories ( name, slug ),

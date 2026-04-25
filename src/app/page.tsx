@@ -37,7 +37,7 @@ export default function HomePage() {
             {ad.is_featured && <span className="badge badge-featured" style={{ position: 'absolute', top: 10, left: 10 }}>⭐ Featured</span>}
           </div>
           <div style={{ padding: '16px 18px' }}>
-            <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 6, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.title}</p>
+            <p className="ad-card-title" style={{ fontWeight: 600, fontSize: 15, marginBottom: 6, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.title}</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#818cf8', fontWeight: 700, fontSize: 16 }}>{ad.price ? `PKR ${ad.price.toLocaleString()}` : 'Contact'}</span>
               <span style={{ color: '#64748b', fontSize: 12 }}>📍 {ad.city_name}</span>
@@ -60,7 +60,7 @@ export default function HomePage() {
           <h1 style={{ fontSize: 'clamp(36px, 6vw, 64px)', fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
             <span className="gradient-text">Advertise Smarter,</span><br />Reach Further
           </h1>
-          <p style={{ color: '#94a3b8', fontSize: 18, lineHeight: 1.7, marginBottom: 40 }}>
+          <p className="hero-subtitle" style={{ color: '#94a3b8', fontSize: 18, lineHeight: 1.7, marginBottom: 40 }}>
             Post, manage, and grow your listings with AdFlow Pro's powerful moderation pipeline, verified payments, and intelligent ranking.
           </p>
 
@@ -148,7 +148,7 @@ export default function HomePage() {
       )}
 
       {/* ── CTA ──────────────────────────────────────────────── */}
-      <section style={{ padding: '60px 24px', background: 'rgba(99,102,241,0.06)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <section className="cta-section" style={{ padding: '60px 24px', background: 'rgba(99,102,241,0.06)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="container" style={{ textAlign: 'center' }}>
           {isLoggedIn ? (
             <>

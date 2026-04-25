@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import AiAssistant from '@/components/AiAssistant';
+import { ThemeProvider } from '@/context/ThemeContext';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -14,9 +17,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <Navbar />
-        <main>{children}</main>
+        {/* Anti-FOUC: apply saved theme before first paint */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){try{var t=localStorage.getItem('adflow_theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();
+        `}} />
+        <ThemeProvider>
+          <Navbar />
+          <main>{children}</main>
+          <Footer />
+          <AiAssistant />
+        </ThemeProvider>
       </body>
     </html>
   );
 }
+

@@ -149,6 +149,28 @@ label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 13px
    RESPONSIVE DESIGN SYSTEM (MOBILE & TABLET AUTOMATION)
    ============================================================ */
 
+/* ── Responsive Helpers ──────────────────────────────────── */
+
+/* Dropdown item hover */
+.dd-item:hover       { background: rgba(255,255,255,0.06) !important; }
+.dd-item-danger:hover { background: rgba(239,68,68,0.1) !important; }
+
+/* Desktop: show nav links, hide hamburger */
+.hamburger-btn        { display: none !important; }
+.nav-center-links     { display: flex !important; }
+.nav-post-btn         { display: inline-flex !important; }
+.nav-signin-link      { display: inline-block !important; }
+.nav-user-name        { display: inline !important; }
+
+/* Tablet / Mobile (≤ 900px) */
+@media (max-width: 900px) {
+  .hamburger-btn    { display: flex !important; align-items: center; justify-content: center; }
+  .nav-center-links { display: none !important; }
+  .nav-post-btn     { display: none !important; }
+  .nav-signin-link  { display: none !important; }
+  .nav-user-name    { display: none !important; }
+}
+
 /* ── Mobile Filter Drawer ────────────────────────────────── */
 .mobile-filter-toggle { display: none !important; }
 
@@ -170,90 +192,190 @@ label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 13px
   }
 }
 
+/* ── Global Grid & Layout Automation ─────────────────────── */
 @media (max-width: 900px) {
-  /* Intelligently crush all desktop-only rigid grids into 1 fluid column */
-  [style*="gridTemplateColumns: '1fr 320px'"],
-  [style*="gridTemplateColumns: '1fr 300px'"],
-  [style*="gridTemplateColumns: '250px 1fr'"],
-  [style*="grid-template-columns: 1fr 320px"],
-  [style*="grid-template-columns: 1fr 300px"],
-  [style*="grid-template-columns: 250px 1fr"],
-  [style*="grid-template-columns:250px 1fr"] {
+  /* Crush desktop-only rigid grids */
+  [style*="gridTemplateColumns"], [style*="grid-template-columns"] {
     grid-template-columns: 1fr !important;
-    gap: 20px !important;
+    gap: 24px !important;
   }
 
-  /* Unstick sidebars and filters to allow natural vertical flowing */
+  /* Unstick sidebars */
   [style*="position: sticky"], [style*="position:sticky"] {
     position: static !important;
     top: auto !important;
   }
 
-  /* Squash padding for mobile screens */
-  .container {
-    padding: 20px 16px !important;
-  }
-  
-  .card:not(.navbar) {
-    padding: 16px !important;
-  }
+  .container { padding: 0 16px !important; }
+  .card { padding: 20px !important; }
 
-  /* Safe wrap for headers (excluding navbar) */
-  [style*="justify-content: space-between"] {
-    flex-wrap: wrap !important;
-    gap: 16px !important;
-  }
-
-  [style*="alignItems: 'center'"], 
-  [style*="align-items: center"] {
-    align-items: flex-start !important; /* Prevents awkward squishing */
-  }
-  
-  .navbar [style*="justify-content: space-between"], 
-  .navbar [style*="justifyContent: 'space-between'"] {
-    flex-wrap: nowrap !important;
-    gap: 0 !important;
-  }
-
-  .navbar [style*="alignItems: 'center'"], 
-  .navbar [style*="align-items: center"] {
-    align-items: center !important;
-  }
+  /* Handle scrolling for tables */
+  table { display: block; overflow-x: auto; white-space: nowrap; }
 }
 
 @media (max-width: 600px) {
-  /* Typography scale down */
-  h1:not(.navbar *) { font-size: 1.5rem !important; }
-  h2:not(.navbar *) { font-size: 1.25rem !important; }
+  h1 { font-size: 28px !important; }
+  h2 { font-size: 22px !important; }
   
-  /* Make main action buttons full-width */
-  .btn:not(.btn-sm):not(.navbar .btn):not(.btn-ghost) {
+  .btn:not(.btn-sm):not(.navbar .btn) {
     width: 100%;
     justify-content: center;
   }
   
-  /* Make Navbar specifically look perfect on tiny screens */
-  .navbar p { display: none; } /* hide 'Pro' text on tiny screens occasionally */
-  .navbar .btn { padding: 8px 12px; font-size: 13px; }
-  .navbar .nav-center { display: none !important; }
+  .hero-section {
+    padding: 60px 0 !important;
+    text-align: center;
+  }
 
-  /* Admin Dashboard Graphs squishing */
-  .charts-grid-container {
-    grid-template-columns: 1fr !important;
+  /* Chat stack */
+  .chat-container {
+    flex-direction: column !important;
   }
-  .chart-card.span-2 {
-    grid-column: span 1 !important;
-  }
-  .admin-header h1 {
-    font-size: 1.25rem !important;
-  }
-  .admin-page-container {
-    padding: 20px 16px !important;
+  .chat-sidebar {
+    width: 100% !important;
+    height: 300px !important;
   }
 }
 
-@media (max-width: 400px) {
-  .admin-page-container {
-    padding: 16px 12px !important;
-  }
+/* ============================================================
+   THEME SYSTEM — Light / Dark
+   ============================================================ */
+
+/* Smooth transitions when switching themes */
+*, *::before, *::after {
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    color 0.15s ease,
+    box-shadow 0.25s ease;
 }
+
+/* Override transitions for elements that shouldn't animate */
+.spinner, .btn, a, button { transition: none; }
+.btn { transition: background 0.2s, transform 0.2s, box-shadow 0.2s; }
+
+/* ── Light Theme Variables ─────────────────────────────────── */
+[data-theme="light"] {
+  --bg:        #f1f5f9;
+  --bg2:       #e8edf5;
+  --surface:   rgba(0,0,0,0.04);
+  --border:    rgba(0,0,0,0.09);
+  --text:      #0f172a;
+  --muted:     #475569;
+  --dim:       #64748b;
+  --primary:   #6366f1;
+  --primary-h: #4f46e5;
+  --success:   #16a34a;
+  --warning:   #d97706;
+  --danger:    #dc2626;
+  --sky:       #0284c7;
+  --shadow:    0 4px 24px rgba(0,0,0,0.10);
+}
+
+/* ── Light: Body & Page ────────────────────────────────────── */
+[data-theme="light"] body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ── Light: Navbar ─────────────────────────────────────────── */
+[data-theme="light"] .navbar {
+  background: rgba(241,245,249,0.88) !important;
+  border-bottom-color: rgba(0,0,0,0.08) !important;
+}
+
+/* ── Light: Hero backgrounds ───────────────────────────────── */
+[data-theme="light"] .hero-bg {
+  background:
+    radial-gradient(ellipse at 50% -20%, rgba(99,102,241,0.12) 0%, transparent 60%),
+    linear-gradient(135deg, #f1f5f9 0%, #e8edf5 100%) !important;
+}
+
+/* ── Light: Cards ──────────────────────────────────────────── */
+[data-theme="light"] .card {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+[data-theme="light"] .card-hover:hover {
+  box-shadow: 0 8px 30px rgba(99,102,241,0.12);
+}
+
+/* ── Light: Inputs ─────────────────────────────────────────── */
+[data-theme="light"] .input,
+[data-theme="light"] .select,
+[data-theme="light"] .textarea {
+  background: rgba(0,0,0,0.04);
+  color: var(--text);
+}
+[data-theme="light"] .select option { background: #f8fafc; color: #0f172a; }
+[data-theme="light"] label { color: var(--muted); }
+
+/* ── Light: Buttons ────────────────────────────────────────── */
+[data-theme="light"] .btn-ghost {
+  color: var(--text);
+}
+[data-theme="light"] .btn-ghost:hover {
+  background: rgba(0,0,0,0.08);
+}
+
+/* ── Light: Badges (keep text readable on light bg) ────────── */
+[data-theme="light"] .badge-draft { background: rgba(71,85,105,0.12); color: #334155; }
+[data-theme="light"] .badge-published { color: #15803d; background: rgba(21,128,61,0.12); }
+[data-theme="light"] .badge-rejected  { color: #b91c1c; background: rgba(185,28,28,0.1); }
+[data-theme="light"] .badge-pending   { color: #c2410c; background: rgba(194,65,12,0.1); }
+[data-theme="light"] .badge-expired   { color: #b91c1c; background: rgba(185,28,28,0.08); }
+
+/* ── Light: Admin pages (have hardcoded gradient backgrounds) ─ */
+[data-theme="light"] .admin-page-container {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+/* ── Light: Dropdown hover helpers ─────────────────────────── */
+[data-theme="light"] .dd-item:hover {
+  background: rgba(0,0,0,0.05) !important;
+}
+[data-theme="light"] .dd-item-danger:hover {
+  background: rgba(220,38,38,0.08) !important;
+}
+
+/* ── Theme Toggle Button ────────────────────────────────────── */
+.theme-toggle {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  background: rgba(99,102,241,0.12);
+  border-color: rgba(99,102,241,0.3);
+  transform: scale(1.08);
+}
+
+/* ── Light: Footer ─────────────────────────────────────────── */
+[data-theme="light"] footer {
+  background: #e2e8f0 !important;
+  border-top: 1px solid rgba(0,0,0,0.08) !important;
+}
+[data-theme="light"] .footer-divider {
+  border-top-color: rgba(0,0,0,0.07) !important;
+}
+[data-theme="light"] .footer-brand-text { color: var(--text)  !important; }
+[data-theme="light"] .footer-heading    { color: var(--text)  !important; }
+[data-theme="light"] .footer-link       { color: var(--muted) !important; }
+[data-theme="light"] .footer-copy       { color: var(--dim)   !important; }
+
+/* ── Light: Homepage ───────────────────────────────────────── */
+[data-theme="light"] .ad-card-title  { color: var(--text)  !important; }
+[data-theme="light"] .hero-subtitle  { color: var(--muted) !important; }
+[data-theme="light"] .cta-section    { border-top-color: rgba(0,0,0,0.06) !important; }
+
+/* ── Light: Stat numbers & misc inline text ────────────────── */
+[data-theme="light"] .stat-label     { color: var(--dim)   !important; }
+[data-theme="light"] .section-meta   { color: var(--muted) !important; }
+
